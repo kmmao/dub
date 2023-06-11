@@ -7,11 +7,11 @@ import { withScreenSize } from "@visx/responsive";
 import { scaleBand, scaleLinear } from "@visx/scale";
 import { useTooltip, useTooltipInPortal } from "@visx/tooltip";
 import { motion } from "framer-motion";
-import { intervalData } from "@/lib/stats";
-import { nFormatter } from "@/lib/utils";
+import { intervalData } from "#/lib/stats";
+import { nFormatter } from "#/lib/utils";
 import styles from "./bar-chart.module.css";
 import useSWR from "swr";
-import { fetcher } from "@/lib/utils";
+import { fetcher } from "#/lib/utils";
 import { LoadingCircle } from "#/ui/icons";
 import { StatsContext } from ".";
 
@@ -94,6 +94,12 @@ const BarChart = ({ screenWidth }: { screenWidth?: number }) => {
               hour: "numeric",
             })
             .replace(",", " ");
+        case "90d":
+        case "all":
+          return new Date(e).toLocaleDateString("en-us", {
+            month: "short",
+            year: "numeric",
+          });
         default:
           return new Date(e).toLocaleDateString("en-us", {
             month: "short",

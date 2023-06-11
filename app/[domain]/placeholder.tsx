@@ -1,10 +1,10 @@
 "use client";
 
-import Background from "@/components/shared/background";
+import Background from "#/ui/home/background";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useDebounce } from "use-debounce";
-import { STAGGER_CHILD_VARIANTS } from "@/lib/constants";
+import { STAGGER_CHILD_VARIANTS } from "#/lib/constants";
 import Spline from "@splinetool/react-spline";
 import { InlineSnippet } from "@/components/app/domains/domain-configuration";
 import { useParams } from "next/navigation";

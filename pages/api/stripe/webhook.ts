@@ -1,11 +1,11 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { Readable } from "node:stream";
 import Stripe from "stripe";
-import prisma from "@/lib/prisma";
-import { stripe } from "@/lib/stripe";
-import { PLANS } from "@/lib/stripe/constants";
-import { redis } from "@/lib/upstash";
-import { log } from "@/lib/utils";
+import prisma from "#/lib/prisma";
+import { stripe } from "#/lib/stripe";
+import { PLANS } from "#/lib/stripe/constants";
+import { redis } from "#/lib/upstash";
+import { log } from "#/lib/utils";
 
 // Stripe requires the raw body to construct the event.
 export const config = {
@@ -172,6 +172,6 @@ export default async function webhookHandler(
     res.status(200).json({ received: true });
   } else {
     res.setHeader("Allow", ["POST"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

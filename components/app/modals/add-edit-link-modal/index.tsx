@@ -15,15 +15,15 @@ import { AlertCircleFill, Lock, Random, X } from "@/components/shared/icons";
 import { LoadingCircle } from "#/ui/icons";
 import Modal from "@/components/shared/modal";
 import Tooltip, { TooltipContent } from "#/ui/tooltip";
-import useProject from "@/lib/swr/use-project";
-import { LinkProps } from "@/lib/types";
+import useProject from "#/lib/swr/use-project";
+import { LinkProps } from "#/lib/types";
 import {
   getApexDomain,
   getQueryString,
   getUrlWithoutUTMParams,
   linkConstructor,
   truncate,
-} from "@/lib/utils";
+} from "#/lib/utils";
 import ExpirationSection from "./expiration-section";
 import OGSection from "./og-section";
 import PasswordSection from "./password-section";
@@ -31,8 +31,8 @@ import UTMSection from "./utm-section";
 import IOSSection from "./ios-section";
 import Preview from "./preview";
 import AndroidSection from "./android-section";
-import { DEFAULT_LINK_PROPS, GOOGLE_FAVICON_URL } from "@/lib/constants";
-import useDomains from "@/lib/swr/use-domains";
+import { DEFAULT_LINK_PROPS, GOOGLE_FAVICON_URL } from "#/lib/constants";
+import useDomains from "#/lib/swr/use-domains";
 import { toast } from "sonner";
 import va from "@vercel/analytics";
 import punycode from "punycode/";
@@ -43,15 +43,15 @@ function AddEditLinkModal({
   setShowAddEditLinkModal,
   props,
   duplicateProps,
-  hideXButton,
   homepageDemo,
+  welcomeFlow,
 }: {
   showAddEditLinkModal: boolean;
   setShowAddEditLinkModal: Dispatch<SetStateAction<boolean>>;
   props?: LinkProps;
   duplicateProps?: LinkProps;
-  hideXButton?: boolean;
   homepageDemo?: boolean;
+  welcomeFlow?: boolean;
 }) {
   const router = useRouter();
   const { slug } = router.query as { slug: string };
@@ -67,7 +67,7 @@ function AddEditLinkModal({
     props ||
       duplicateProps || {
         ...DEFAULT_LINK_PROPS,
-        domain: primaryDomain || "",
+        domain: primaryDomain || (domains && domains[0].slug) || "",
         key: "",
         url: "",
       },
@@ -251,9 +251,10 @@ function AddEditLinkModal({
       showModal={showAddEditLinkModal}
       setShowModal={setShowAddEditLinkModal}
       closeWithX={homepageDemo ? false : true}
+      hideBackdrop={welcomeFlow}
     >
       <div className="relative grid max-h-[min(906px,_90vh)] w-full divide-x divide-gray-100 overflow-auto bg-white shadow-xl transition-all scrollbar-hide md:max-w-screen-lg md:grid-cols-2 md:overflow-hidden md:rounded-2xl md:border md:border-gray-200">
-        {!hideXButton && !homepageDemo && (
+        {!welcomeFlow && !homepageDemo && (
           <button
             onClick={() => setShowAddEditLinkModal(false)}
             className="group absolute right-0 top-0 z-20 m-3 hidden rounded-full p-2 text-gray-500 transition-all duration-75 hover:bg-gray-100 focus:outline-none active:bg-gray-200 md:block"
@@ -323,7 +324,7 @@ function AddEditLinkModal({
                       .writeText(
                         linkConstructor({
                           // remove leading and trailing slashes
-                          key: data.key.replace(/^\/|\/$/g, ""),
+                          key: data.key.replace(/^\/+|\/+$/g, ""),
                           domain,
                         }),
                       )
@@ -459,8 +460,12 @@ function AddEditLinkModal({
                       name="key"
                       id={`key-${randomIdx}`}
                       required
-                      // Unicode regex to match characters from all languages and numbers (and omit all symbols except for dashes and slashes)
-                      pattern="[\p{Letter}\p{Mark}\d/-]+"
+                      pattern="[\p{L}\p{N}\p{Pd}\/]+"
+                      onInvalid={(e) => {
+                        e.currentTarget.setCustomValidity(
+                          "Only letters, numbers, '-', and '/' are allowed.",
+                        );
+                      }}
                       className={`${
                         keyError
                           ? "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500"
@@ -470,6 +475,7 @@ function AddEditLinkModal({
                       value={key}
                       onChange={(e) => {
                         setKeyError(null);
+                        e.currentTarget.setCustomValidity("");
                         setData({ ...data, key: e.target.value });
                       }}
                       aria-invalid="true"
@@ -618,13 +624,13 @@ function AddEditLinkButton({
 export function useAddEditLinkModal({
   props,
   duplicateProps,
-  hideXButton,
   homepageDemo,
+  welcomeFlow,
 }: {
   props?: LinkProps;
   duplicateProps?: LinkProps;
-  hideXButton?: boolean;
   homepageDemo?: boolean;
+  welcomeFlow?: boolean;
 } = {}) {
   const [showAddEditLinkModal, setShowAddEditLinkModal] = useState(false);
 
@@ -635,8 +641,8 @@ export function useAddEditLinkModal({
         setShowAddEditLinkModal={setShowAddEditLinkModal}
         props={props}
         duplicateProps={duplicateProps}
-        hideXButton={hideXButton}
         homepageDemo={homepageDemo}
+        welcomeFlow={welcomeFlow}
       />
     );
   }, [showAddEditLinkModal, setShowAddEditLinkModal]);

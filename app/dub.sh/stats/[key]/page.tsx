@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { getLinkViaEdge } from "@/lib/planetscale";
+import { getLinkViaEdge } from "#/lib/planetscale";
 import Stats from "#/ui/stats";
 import { Suspense } from "react";
 import { Metadata } from "next";
-import { constructMetadata } from "@/lib/utils";
+import { constructMetadata } from "#/lib/utils";
 
 export const runtime = "edge";
 
@@ -46,7 +46,7 @@ export default async function StatsPage({
 
   return (
     <div className="bg-gray-50">
-      <Suspense>
+      <Suspense fallback={<div className="h-screen w-full bg-gray-50" />}>
         <Stats staticDomain="dub.sh" />
       </Suspense>
     </div>

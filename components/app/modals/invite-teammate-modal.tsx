@@ -10,7 +10,7 @@ import { mutate } from "swr";
 import BlurImage from "#/ui/blur-image";
 import va from "@vercel/analytics";
 import Modal from "@/components/shared/modal";
-import useProject from "@/lib/swr/use-project";
+import useProject from "#/lib/swr/use-project";
 import { toast } from "sonner";
 import Button from "#/ui/button";
 
@@ -52,7 +52,7 @@ function InviteTeammateModal({
           onSubmit={async (e) => {
             e.preventDefault();
             setInviting(true);
-            fetch(`/api/projects/${slug}/invite`, {
+            fetch(`/api/projects/${slug}/invites`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email }),
@@ -63,7 +63,7 @@ function InviteTeammateModal({
                 va.track("User invited teammate", {
                   project: slug,
                 });
-                mutate(`/api/projects/${slug}/invite`);
+                mutate(`/api/projects/${slug}/invites`);
                 setShowInviteTeammateModal(false);
               } else {
                 const error = await res.text();
@@ -83,6 +83,7 @@ function InviteTeammateModal({
                 name="email"
                 id="email"
                 placeholder="panic@thedis.co"
+                autoComplete="off"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

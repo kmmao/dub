@@ -1,6 +1,6 @@
 import { ImageResponse, NextRequest } from "next/server";
 import { allChangelogPosts } from "contentlayer/generated";
-import { formatDate } from "@/lib/utils";
+import { formatDate } from "#/lib/utils";
 
 export const runtime = "edge";
 export const contentType = "image/png";
@@ -40,10 +40,7 @@ export default async function handler() {
         }}
       >
         <img
-          src={new URL(
-            "../../../public/_static/logotype.png",
-            import.meta.url,
-          ).toString()}
+          src="https://dub.sh/_static/logotype.png"
           style={{
             height: "40px",
             position: "absolute",
@@ -67,7 +64,7 @@ export default async function handler() {
         <div tw="flex w-full pt-10 pl-28">
           <p tw="text-gray-500">{formatDate(post.publishedAt)}</p>
           <div tw="flex flex-col ml-24">
-            <img src={post.image} tw="rounded-lg h-96 object-cover" />
+            <img src={post.image} tw="rounded-lg h-96" />
           </div>
         </div>
       </div>

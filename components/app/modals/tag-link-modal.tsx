@@ -12,14 +12,14 @@ import {
 import { mutate } from "swr";
 import BlurImage from "#/ui/blur-image";
 import Modal from "@/components/shared/modal";
-import { LinkProps, TagProps } from "@/lib/types";
-import { getApexDomain, getQueryString, linkConstructor } from "@/lib/utils";
-import { GOOGLE_FAVICON_URL } from "@/lib/constants";
+import { LinkProps, TagProps } from "#/lib/types";
+import { getApexDomain, getQueryString, linkConstructor } from "#/lib/utils";
+import { GOOGLE_FAVICON_URL } from "#/lib/constants";
 import { toast } from "sonner";
 import { Check, ChevronDown, Search, Trash, X } from "lucide-react";
 import { Command } from "cmdk";
 import Button from "#/ui/button";
-import useTags from "@/lib/swr/use-tags";
+import useTags from "#/lib/swr/use-tags";
 import TagBadge, { COLORS_LIST } from "@/components/app/links/tag-badge";
 import va from "@vercel/analytics";
 import { ThreeDots } from "@/components/shared/icons";
@@ -153,17 +153,7 @@ function TagLinkModal({
             height={20}
           />
           <h3 className="text-lg font-medium">{type.title}</h3>
-          <p className="text-sm text-gray-500">
-            {type.description} <br className="mt-1" />
-            <a
-              className="underline underline-offset-4 transition-colors hover:text-black"
-              href="https://dub.sh/tags"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Read the announcement.
-            </a>
-          </p>
+          <p className="text-sm text-gray-500">{type.description}</p>
         </div>
 
         <form

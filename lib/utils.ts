@@ -38,6 +38,7 @@ export function constructMetadata({
       images: [image],
       creator: "@dubdotsh",
     },
+    icons: "/favicon.ico",
     metadataBase: new URL("https://dub.sh"),
     themeColor: "#FFF",
   };
@@ -207,6 +208,8 @@ export const generateDomainFromName = (name: string) => {
 export const validDomainRegex = new RegExp(
   /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/,
 );
+
+export const validKeyRegex = new RegExp(/^[0-9A-Za-z\u0080-\uFFFF\/\-]*$/u);
 
 export const validSlugRegex = new RegExp(/^[a-zA-Z0-9\-]+$/);
 

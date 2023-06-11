@@ -1,6 +1,7 @@
-import { withProjectAuth } from "@/lib/auth";
-import { deleteDomainAndLinks } from "@/lib/api/domains";
-import prisma from "@/lib/prisma";
+import { withProjectAuth } from "#/lib/auth";
+import { deleteDomainAndLinks } from "#/lib/api/domains";
+import prisma from "#/lib/prisma";
+import { cancelSubscription } from "#/lib/stripe";
 
 export default withProjectAuth(async (req, res, project) => {
   // GET /api/projects/[slug] – get a specific project
@@ -39,10 +40,17 @@ export default withProjectAuth(async (req, res, project) => {
       })
     ).map((domain) => domain.slug);
 
+    // delete all domains, links, and uploaded images associated with the project
     const deleteDomainsResponse = await Promise.allSettled(
       domains.map((domain) => deleteDomainAndLinks(domain)),
     );
 
+    // if they have a Stripe subscription, cancel it
+    const cancelSubscriptionResponse = await cancelSubscription(
+      project.stripeId,
+    );
+
+    // delete the project
     const deleteProjectResponse = await prisma.project.delete({
       where: {
         slug: project.slug,
@@ -51,10 +59,11 @@ export default withProjectAuth(async (req, res, project) => {
 
     return res.status(200).json({
       deleteProjectResponse,
+      cancelSubscriptionResponse,
       deleteDomainsResponse,
     });
   } else {
     res.setHeader("Allow", ["GET", "PUT", "DELETE"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 });

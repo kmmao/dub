@@ -11,7 +11,7 @@ import { mutate } from "swr";
 import BlurImage from "#/ui/blur-image";
 import { LoadingDots } from "#/ui/icons";
 import Modal from "@/components/shared/modal";
-import useProject from "@/lib/swr/use-project";
+import useProject from "#/lib/swr/use-project";
 import { toast } from "sonner";
 import va from "@vercel/analytics";
 
@@ -55,7 +55,7 @@ function AcceptInviteModal({
             <button
               onClick={() => {
                 setAccepting(true);
-                fetch(`/api/projects/${slug}/invite/accept`, {
+                fetch(`/api/projects/${slug}/invites/accept`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                 }).then(() => {

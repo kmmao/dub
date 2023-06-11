@@ -12,15 +12,15 @@ import { ChevronRight, Clipboard, Logo } from "@/components/shared/icons";
 import Modal from "@/components/shared/modal";
 import Switch from "#/ui/switch";
 import Tooltip, { TooltipContent } from "#/ui/tooltip";
-import { QRCodeSVG, getQRAsCanvas, getQRAsSVGDataUri } from "@/lib/qr";
-import useProject from "@/lib/swr/use-project";
-import { SimpleLinkProps } from "@/lib/types";
-import { getApexDomain, linkConstructor } from "@/lib/utils";
+import { QRCodeSVG, getQRAsCanvas, getQRAsSVGDataUri } from "#/lib/qr";
+import useProject from "#/lib/swr/use-project";
+import { SimpleLinkProps } from "#/lib/types";
+import { getApexDomain, linkConstructor } from "#/lib/utils";
 import IconMenu from "@/components/shared/icon-menu";
 import { Download, Photo } from "@/components/shared/icons";
 import Popover from "@/components/shared/popover";
 import { toast } from "sonner";
-import { GOOGLE_FAVICON_URL } from "@/lib/constants";
+import { GOOGLE_FAVICON_URL } from "#/lib/constants";
 
 function LinkQRModalHelper({
   showLinkQRModal,
@@ -233,7 +233,7 @@ function AdvancedSettings({ qrData, setFgColor, showLogo, setShowLogo }) {
                   <TooltipContent
                     title="As a freemium product, we rely on word of mouth to spread the word about Dub. If you'd like to remove the Dub logo/upload your own, please consider upgrading to a Pro plan."
                     cta="Upgrade to Pro"
-                    href={isApp ? "/settings" : "/#pricing"}
+                    href={isApp ? "/settings" : "/pricing"}
                   />
                 }
               >

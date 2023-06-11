@@ -1,6 +1,6 @@
 import { randomBadgeColor } from "@/components/app/links/tag-badge";
-import { withProjectAuth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { withProjectAuth } from "#/lib/auth";
+import prisma from "#/lib/prisma";
 
 export default withProjectAuth(async (req, res, project) => {
   // GET /api/projects/[slug]/tags - get all tags for a project
@@ -43,6 +43,6 @@ export default withProjectAuth(async (req, res, project) => {
     return res.status(200).json(response);
   } else {
     res.setHeader("Allow", ["GET", "POST"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 });

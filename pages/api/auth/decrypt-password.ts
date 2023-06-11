@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import prisma from "@/lib/prisma";
+import prisma from "#/lib/prisma";
 
 export default async function handler(
   req: NextApiRequest,
@@ -23,6 +23,6 @@ export default async function handler(
     }
   } else {
     res.setHeader("Allow", ["POST"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

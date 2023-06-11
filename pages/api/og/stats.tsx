@@ -1,7 +1,7 @@
 import { ImageResponse, NextRequest } from "next/server";
-import { getLinkViaEdge } from "@/lib/planetscale";
-import { getStats } from "@/lib/stats";
-import { nFormatter, truncate } from "@/lib/utils";
+import { getLinkViaEdge } from "#/lib/planetscale";
+import { getStats } from "#/lib/stats";
+import { nFormatter, truncate } from "#/lib/utils";
 
 export const runtime = "edge";
 export const contentType = "image/png";
@@ -50,17 +50,11 @@ export default async function handler(req: NextRequest) {
           flexDirection: "column",
           alignItems: "center",
           backgroundColor: "white",
-          backgroundImage: `url(${new URL(
-            "../../../public/_static/background.png",
-            import.meta.url,
-          ).toString()})`,
+          backgroundImage: `url(https://dub.sh/_static/background.png)`,
         }}
       >
         <img
-          src={new URL(
-            "../../../public/_static/logo.png",
-            import.meta.url,
-          ).toString()}
+          src="https://dub.sh/_static/logo.png"
           style={{
             width: "80px",
             height: "80px",

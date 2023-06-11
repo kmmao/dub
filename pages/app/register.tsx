@@ -2,17 +2,20 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import Meta from "@/components/layout/meta";
 import BlurImage from "#/ui/blur-image";
-import Background from "@/components/shared/background";
+import Background from "#/ui/home/background";
 import { Google } from "@/components/shared/icons";
 import Button from "#/ui/button";
 import { SSOWaitlist } from "#/ui/tooltip";
 import Link from "next/link";
+import { useRouter } from "next/router";
 
 export default function Register() {
+  const router = useRouter();
+  const { next } = router.query as { next?: string };
   const [clickedGoogle, setClickedGoogle] = useState(false);
 
   return (
-    <div className="flex h-screen w-screen justify-center bg-gray-50">
+    <div className="flex h-screen w-screen justify-center">
       <Meta title="Sign up for Dub" />
       <Background />
       <div className="z-10 mt-[calc(30vh)] h-fit w-full max-w-md overflow-hidden border border-gray-100 sm:rounded-2xl sm:shadow-xl">
@@ -43,7 +46,9 @@ export default function Register() {
             text="Continue with Google"
             onClick={() => {
               setClickedGoogle(true);
-              signIn("google");
+              signIn("google", {
+                ...(next && next.length > 0 ? { callbackUrl: next } : {}),
+              });
             }}
             loading={clickedGoogle}
             icon={<Google className="h-4 w-4" />}

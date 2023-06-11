@@ -1,8 +1,8 @@
-import { addLink, getLinksForProject } from "@/lib/api/links";
-import { withLinksAuth } from "@/lib/auth";
-import { isBlacklistedDomain, isBlacklistedKey } from "@/lib/utils";
-import { log } from "@/lib/utils";
-import { DUB_PROJECT_ID, GOOGLE_FAVICON_URL } from "@/lib/constants";
+import { addLink, getLinksForProject, processKey } from "#/lib/api/links";
+import { withLinksAuth } from "#/lib/auth";
+import { isBlacklistedDomain, isBlacklistedKey } from "#/lib/utils";
+import { log } from "#/lib/utils";
+import { DUB_PROJECT_ID, GOOGLE_FAVICON_URL } from "#/lib/constants";
 
 export const config = {
   api: {
@@ -39,9 +39,9 @@ export default withLinksAuth(
 
       // POST /api/links – create a new link
     } else if (req.method === "POST") {
-      let { key, url } = req.body;
-      if (!key || !url) {
-        return res.status(400).end("Missing key or url.");
+      let { domain, key, url } = req.body;
+      if (!domain || !key || !url) {
+        return res.status(400).end("Missing domain or key or url.");
       }
 
       // if it's not a custom project, do some filtering
@@ -57,13 +57,17 @@ export default withLinksAuth(
         if (domainBlacklisted) {
           return res.status(422).end("Invalid url.");
         }
-      } else if (key === "/") {
-        return res.status(422).end("Key cannot be '/'.");
+      }
+
+      key = processKey(key);
+      if (!key) {
+        return res.status(422).end("Invalid key.");
       }
 
       const [response, invalidFavicon] = await Promise.allSettled([
         addLink({
           ...req.body,
+          key,
           projectId: project?.id || DUB_PROJECT_ID,
           userId: session.user.id,
         }),

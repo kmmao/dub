@@ -1,5 +1,5 @@
-import { withProjectAuth } from "@/lib/auth";
-import { stripe } from "@/lib/stripe";
+import { withProjectAuth } from "#/lib/auth";
+import { stripe } from "#/lib/stripe";
 
 export default withProjectAuth(async (req, res, project, session) => {
   // POST /api/projects/[slug]/billing/upgrade – upgrade a project from free to pro
@@ -27,11 +27,12 @@ export default withProjectAuth(async (req, res, project, session) => {
         enabled: true,
       },
       mode: "subscription",
+      allow_promotion_codes: true,
       client_reference_id: project.id,
     });
     return res.status(200).json(stripeSession);
   } else {
     res.setHeader("Allow", ["POST"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 });

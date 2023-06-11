@@ -7,12 +7,12 @@ import {
   Tick,
 } from "@/components/shared/icons";
 import { ExpandingArrow } from "#/ui/icons";
-import { INTERVALS } from "@/lib/stats";
-import { linkConstructor } from "@/lib/utils";
+import { INTERVALS } from "#/lib/stats";
+import { linkConstructor } from "#/lib/utils";
 import IconMenu from "@/components/shared/icon-menu";
 import Popover from "#/ui/popover";
 import useSWR, { mutate } from "swr";
-import { fetcher } from "@/lib/utils";
+import { fetcher } from "#/lib/utils";
 import { toast } from "sonner";
 import Switch from "#/ui/switch";
 import Link from "next/link";
@@ -40,7 +40,7 @@ export default function Toggle() {
     <div
       className={`z-10 mb-5 ${
         basePath.startsWith("/stats")
-          ? `top-0 ${!modal ? "md:top-16" : ""}`
+          ? `top-0 ${!modal ? "md:top-14" : ""}`
           : "top-[6.95rem]"
       } sticky bg-gray-50 py-3 md:py-5 ${
         scrolled && !modal ? "shadow-md" : ""
@@ -64,7 +64,9 @@ export default function Toggle() {
             content={
               <div className="w-full p-2 md:w-48">
                 {INTERVALS.map(({ display, slug }) =>
-                  slug === "all" && (!plan || plan === "free") ? (
+                  !(domain === "dub.sh" && key === "github") &&
+                  (slug === "all" || slug === "90d") &&
+                  (!plan || plan === "free") ? (
                     <Tooltip
                       key={slug}
                       content={
@@ -90,6 +92,7 @@ export default function Toggle() {
                     <Link
                       key={slug}
                       href={`${basePath}?interval=${slug}`}
+                      replace
                       className="flex w-full items-center justify-between space-x-2 rounded-md p-2 hover:bg-gray-100 active:bg-gray-200"
                     >
                       <p className="text-sm">{display}</p>

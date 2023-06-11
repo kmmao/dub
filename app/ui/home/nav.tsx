@@ -5,8 +5,11 @@ import Image from "next/image";
 import { useParams, useSelectedLayoutSegment } from "next/navigation";
 import useScroll from "#/lib/hooks/use-scroll";
 import clsx from "clsx";
+import MaxWidthWrapper from "@/components/shared/max-width-wrapper";
 
-const transparentHeaderSegments = new Set(["metatags"]);
+const navItems = ["pricing", "changelog"];
+
+const transparentHeaderSegments = new Set(["metatags", "pricing"]);
 
 export default function Nav() {
   const { domain = "dub.sh" } = useParams() as { domain: string };
@@ -22,7 +25,7 @@ export default function Nav() {
           segment && !transparentHeaderSegments.has(segment),
       })}
     >
-      <div className="mx-auto w-full max-w-screen-xl px-5 md:px-20">
+      <MaxWidthWrapper>
         <div className="flex h-14 items-center justify-between">
           <Link
             href={
@@ -40,19 +43,22 @@ export default function Nav() {
             />
           </Link>
 
-          <div className="flex items-center space-x-6">
-            <Link
-              href={
-                domain === "dub.sh"
-                  ? "/changelog"
-                  : `https://dub.sh/changelog?utm_source=${domain}&utm_medium=referral&utm_campaign=custom-domain`
-              }
-              className={`rounded-md text-sm font-medium ${
-                segment === "changelog" ? "text-black" : "text-gray-500"
-              } transition-colors ease-out hover:text-black`}
-            >
-              Changelog
-            </Link>
+          <div className="hidden items-center space-x-6 sm:flex">
+            {navItems.map((item) => (
+              <Link
+                key={item}
+                href={
+                  domain === "dub.sh"
+                    ? `/${item}`
+                    : `https://dub.sh/${item}?utm_source=${domain}&utm_medium=referral&utm_campaign=custom-domain`
+                }
+                className={`rounded-md text-sm font-medium capitalize ${
+                  segment === item ? "text-black" : "text-gray-500"
+                } transition-colors ease-out hover:text-black`}
+              >
+                {item}
+              </Link>
+            ))}
             <Link
               href={
                 process.env.NEXT_PUBLIC_VERCEL_ENV === "production"
@@ -75,7 +81,7 @@ export default function Nav() {
             </Link>
           </div>
         </div>
-      </div>
+      </MaxWidthWrapper>
     </div>
   );
 }

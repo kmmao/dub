@@ -1,10 +1,9 @@
 import sendMail from "emails";
 import InvalidDomain from "emails/InvalidDomain";
 import DomainDeleted from "emails/DomainDeleted";
-import { log } from "@/lib/utils";
-import { deleteDomainAndLinks } from "@/lib/api/domains";
-import prisma from "@/lib/prisma";
-import { getClicksForDomain } from "../tinybird";
+import { log } from "#/lib/utils";
+import { deleteDomainAndLinks } from "#/lib/api/domains";
+import prisma from "#/lib/prisma";
 
 export const handleDomainUpdates = async ({
   domain,
@@ -47,6 +46,7 @@ export const handleDomainUpdates = async ({
     select: {
       slug: true,
       sentEmails: true,
+      usage: true,
       users: {
         where: {
           role: "owner",
@@ -80,19 +80,27 @@ export const handleDomainUpdates = async ({
 
   // if domain is invalid for more than 30 days, check if we can delete it
   if (invalidDays >= 30) {
-    // only delete if there are no links associated with the domain
+    // if there are still links associated with the domain,
+    // and those links have clicks associated with them,
+    // don't delete the domain (manual inspection required)
     if (linksCount > 0) {
-      // if there are links, check if there are any link clicks
-      const clicksForDomain = await getClicksForDomain(domain);
-      if (clicksForDomain > 0) {
-        await log(
-          `Domain *${domain}* has been invalid for > 30 days but has link clicks, not deleting.`,
+      const linksClicks = await prisma.link.aggregate({
+        _sum: {
+          clicks: true,
+        },
+        where: {
+          domain,
+        },
+      });
+      if (linksClicks._sum?.clicks) {
+        return await log(
+          `Domain *${domain}* has been invalid for > 30 days and has links with clicks, skipping.`,
           "cron",
           true,
         );
-        return;
       }
     }
+    // else, delete the domain, but first,
     // check if the project needs to be deleted as well
     const deleteProjectAsWell = project._count.domains === 1;
 

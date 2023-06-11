@@ -1,16 +1,16 @@
-import { withProjectAuth } from "@/lib/auth";
+import { withProjectAuth } from "#/lib/auth";
 import {
   addDomainToVercel,
   removeDomainFromVercel,
   validateDomain,
-} from "@/lib/api/domains";
-import prisma from "@/lib/prisma";
+} from "#/lib/api/domains";
+import prisma from "#/lib/prisma";
 import {
   changeDomainForImages,
   changeDomainForLinks,
   deleteDomainAndLinks,
   setRootDomain,
-} from "@/lib/api/domains";
+} from "#/lib/api/domains";
 
 export default withProjectAuth(async (req, res, project) => {
   const { slug, domain } = req.query as { slug: string; domain: string };
@@ -112,6 +112,6 @@ export default withProjectAuth(async (req, res, project) => {
     return res.status(200).json(response);
   } else {
     res.setHeader("Allow", ["PUT", "DELETE"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 });

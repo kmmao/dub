@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import prisma from "#/lib/prisma";
 import { notFound } from "next/navigation";
 import Stats from "#/ui/stats";
 import { Suspense } from "react";
@@ -89,7 +89,7 @@ export default async function StatsPage({
 
   return (
     <div className="bg-gray-50">
-      <Suspense>
+      <Suspense fallback={<div className="h-screen w-full bg-gray-50" />}>
         <Stats staticDomain={params.domain} />
       </Suspense>
     </div>

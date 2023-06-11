@@ -1,13 +1,13 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { Session, withUserAuth } from "@/lib/auth";
-import { DEFAULT_REDIRECTS } from "@/lib/constants";
+import { Session, withUserAuth } from "#/lib/auth";
+import { DEFAULT_REDIRECTS } from "#/lib/constants";
 import {
   addDomainToVercel,
   domainExists,
   validateDomain,
-} from "@/lib/api/domains";
-import prisma from "@/lib/prisma";
-import { isReservedKey, validSlugRegex } from "@/lib/utils";
+} from "#/lib/api/domains";
+import prisma from "#/lib/prisma";
+import { isReservedKey, validSlugRegex } from "#/lib/utils";
 
 export default withUserAuth(
   async (req: NextApiRequest, res: NextApiResponse, session: Session) => {
@@ -100,9 +100,7 @@ export default withUserAuth(
       return res.status(200).json(response);
     } else {
       res.setHeader("Allow", ["GET", "POST"]);
-      return res
-        .status(405)
-        .json({ error: `Method ${req.method} Not Allowed` });
+      return res.status(405).end(`Method ${req.method} Not Allowed`);
     }
   },
 );

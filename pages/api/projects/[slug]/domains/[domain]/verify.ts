@@ -1,11 +1,11 @@
-import { withProjectAuth } from "@/lib/auth";
+import { withProjectAuth } from "#/lib/auth";
 import {
   getConfigResponse,
   getDomainResponse,
   verifyDomain,
-} from "@/lib/api/domains";
-import prisma from "@/lib/prisma";
-import { DomainVerificationStatusProps } from "@/lib/types";
+} from "#/lib/api/domains";
+import prisma from "#/lib/prisma";
+import { DomainVerificationStatusProps } from "#/lib/types";
 
 export default withProjectAuth(async (req, res) => {
   // GET /api/projects/[slug]/domains/[domain]/verify - get domain verification status
@@ -85,6 +85,6 @@ export default withProjectAuth(async (req, res) => {
     });
   } else {
     res.setHeader("Allow", ["GET"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 });

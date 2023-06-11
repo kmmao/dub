@@ -1,20 +1,27 @@
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import Meta from "@/components/layout/meta";
 import BlurImage from "#/ui/blur-image";
-import Background from "@/components/shared/background";
+import Background from "#/ui/home/background";
 import { toast } from "sonner";
 import Button from "#/ui/button";
 import { Google } from "@/components/shared/icons";
 import { SSOWaitlist } from "#/ui/tooltip";
+import { useRouter } from "next/router";
 
 export default function Login() {
+  const router = useRouter();
+  const { next, error } = router.query as { next?: string; error?: string };
   const [showEmailOption, setShowEmailOption] = useState(false);
   const [noSuchAccount, setNoSuchAccount] = useState(false);
   const [email, setEmail] = useState("");
   const [clickedGoogle, setClickedGoogle] = useState(false);
   const [clickedEmail, setClickedEmail] = useState(false);
+
+  useEffect(() => {
+    error && toast.error(error);
+  }, [error]);
 
   return (
     <div className="flex h-screen w-screen justify-center">
@@ -47,7 +54,9 @@ export default function Login() {
             text="Continue with Google"
             onClick={() => {
               setClickedGoogle(true);
-              signIn("google");
+              signIn("google", {
+                ...(next && next.length > 0 ? { callbackUrl: next } : {}),
+              });
             }}
             loading={clickedGoogle}
             disabled={clickedEmail}
@@ -68,6 +77,7 @@ export default function Login() {
                     signIn("email", {
                       email,
                       redirect: false,
+                      ...(next && next.length > 0 ? { callbackUrl: next } : {}),
                     }).then((res) => {
                       setClickedEmail(false);
                       if (res?.ok && !res?.error) {

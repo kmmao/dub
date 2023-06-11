@@ -1,5 +1,5 @@
-import { withProjectAuth } from "@/lib/auth";
-import { stripe } from "@/lib/stripe";
+import { withProjectAuth } from "#/lib/auth";
+import { stripe } from "#/lib/stripe";
 
 export default withProjectAuth(async (req, res, project) => {
   // POST /api/projects/[slug]/billing/manage – manage a user's subscription
@@ -19,6 +19,6 @@ export default withProjectAuth(async (req, res, project) => {
     return res.status(200).json(url);
   } else {
     res.setHeader("Allow", ["POST"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 });

@@ -1,5 +1,5 @@
-import { withUserAuth } from "@/lib/auth";
-import { domainExists } from "@/lib/api/domains";
+import { withUserAuth } from "#/lib/auth";
+import { domainExists } from "#/lib/api/domains";
 
 export default withUserAuth(async (req, res) => {
   const { domain } = req.query as { domain: string };
@@ -16,6 +16,6 @@ export default withUserAuth(async (req, res) => {
     }
   } else {
     res.setHeader("Allow", ["GET"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 });

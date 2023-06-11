@@ -1,7 +1,7 @@
-import { withLinksAuth } from "@/lib/auth";
-import { deleteLink, editLink } from "@/lib/api/links";
-import { isBlacklistedDomain, isBlacklistedKey, log } from "@/lib/utils";
-import { GOOGLE_FAVICON_URL } from "@/lib/constants";
+import { withLinksAuth } from "#/lib/auth";
+import { deleteLink, editLink, processKey } from "#/lib/api/links";
+import { isBlacklistedDomain, isBlacklistedKey, log } from "#/lib/utils";
+import { GOOGLE_FAVICON_URL } from "#/lib/constants";
 
 export const config = {
   api: {
@@ -24,9 +24,9 @@ export default withLinksAuth(
 
       // PUT /api/links/:key – edit a link
     } else if (req.method === "PUT") {
-      let { key, url } = req.body;
-      if (!key || !url) {
-        return res.status(400).end("Missing key or url.");
+      let { domain, key, url } = req.body;
+      if (!domain || !key || !url) {
+        return res.status(400).end("Missing domain or key or url.");
       }
 
       if (!project) {
@@ -41,14 +41,18 @@ export default withLinksAuth(
         if (domainBlacklisted) {
           return res.status(422).end("Invalid url.");
         }
-      } else if (key === "/") {
-        return res.status(422).end("Key cannot be '/'.");
+      }
+
+      key = processKey(key);
+      if (!key) {
+        return res.status(422).end("Invalid key.");
       }
 
       const [response, invalidFavicon] = await Promise.allSettled([
         editLink(
           {
             ...req.body,
+            key,
             domain: req.body.domain || "dub.sh",
             userId: session.user.id,
           },
