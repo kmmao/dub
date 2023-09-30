@@ -1,24 +1,34 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 import { Metadata } from "next";
 import { NextRouter } from "next/router";
 import ms from "ms";
 import { customAlphabet } from "nanoid";
+import slugify from "@sindresorhus/slugify";
 import {
   SPECIAL_APEX_DOMAINS,
   ccTLDs,
   SECOND_LEVEL_DOMAINS,
-  HOME_HOSTNAMES,
+  HOME_DOMAIN,
 } from "./constants";
-import { get } from "@vercel/edge-config";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export function constructMetadata({
   title = "Dub - Link Management for Modern Marketing Teams",
   description = "Dub is an open-source link management tool for modern marketing teams to create, share, and track short links.",
-  image = "https://dub.sh/_static/thumbnail.png",
+  image = "https://dub.co/_static/thumbnail.png",
+  icons = "/favicon.ico",
+  noIndex = false,
 }: {
   title?: string;
   description?: string;
   image?: string;
-}): Metadata {
+  icons?: string;
+  noIndex?: boolean;
+} = {}): Metadata {
   return {
     title,
     description,
@@ -36,11 +46,17 @@ export function constructMetadata({
       title,
       description,
       images: [image],
-      creator: "@dubdotsh",
+      creator: "@dubdotco",
     },
-    icons: "/favicon.ico",
-    metadataBase: new URL("https://dub.sh"),
+    icons,
+    metadataBase: new URL(HOME_DOMAIN),
     themeColor: "#FFF",
+    ...(noIndex && {
+      robots: {
+        index: false,
+        follow: false,
+      },
+    }),
   };
 }
 
@@ -69,8 +85,16 @@ export async function fetcher<JSON = any>(
   return res.json();
 }
 
-export function nFormatter(num?: number, digits?: number) {
+export function nFormatter(
+  num?: number,
+  opts: { digits?: number; full?: boolean } = {
+    digits: 1,
+  },
+) {
   if (!num) return "0";
+  if (opts.full) {
+    return Intl.NumberFormat("en-US").format(num);
+  }
   const lookup = [
     { value: 1, symbol: "" },
     { value: 1e3, symbol: "K" },
@@ -88,7 +112,7 @@ export function nFormatter(num?: number, digits?: number) {
       return num >= item.value;
     });
   return item
-    ? (num / item.value).toFixed(digits || 1).replace(rx, "$1") + item.symbol
+    ? (num / item.value).toFixed(opts.digits).replace(rx, "$1") + item.symbol
     : "0";
 }
 
@@ -124,19 +148,32 @@ export function linkConstructor({
   pretty?: boolean;
   noDomain?: boolean;
 }) {
-  const link = `${localhost ? "http://localhost:3000" : `https://${domain}`}${
-    key !== "_root" ? `/${key}` : ""
-  }`;
+  const link = `${
+    localhost ? "http://home.localhost:8888" : `https://${domain}`
+  }${key !== "_root" ? `/${key}` : ""}`;
 
   if (noDomain) return `/${key}`;
   return pretty ? link.replace(/^https?:\/\//, "") : link;
 }
 
-export const timeAgo = (timestamp?: Date, timeOnly?: boolean): string => {
-  if (!timestamp) return "never";
-  return `${ms(Date.now() - new Date(timestamp).getTime())}${
-    timeOnly ? "" : " ago"
-  }`;
+export const timeAgo = (timestamp?: Date): string => {
+  if (!timestamp) return "Just now";
+  const diff = Date.now() - new Date(timestamp).getTime();
+  if (diff < 60000) {
+    // less than 1 second
+    return "Just now";
+  } else if (diff > 82800000) {
+    // more than 23 hours – similar to how Twitter displays timestamps
+    return new Date(timestamp).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year:
+        new Date(timestamp).getFullYear() !== new Date().getFullYear()
+          ? "numeric"
+          : undefined,
+    });
+  }
+  return ms(diff);
 };
 
 export const getDateTimeLocal = (timestamp?: Date): string => {
@@ -180,11 +217,25 @@ export const getFirstAndLastDay = (day: number) => {
   }
 };
 
+// Function to get the last day of the current month
+export const getLastDayOfMonth = () => {
+  const today = new Date();
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0); // This will give the last day of the current month
+  return lastDay.getDate();
+};
+
+// Adjust the billingCycleStart based on the number of days in the current month
+export const getAdjustedBillingCycleStart = (billingCycleStart) => {
+  const lastDay = getLastDayOfMonth();
+  if (billingCycleStart > lastDay) {
+    return lastDay;
+  } else {
+    return billingCycleStart;
+  }
+};
+
 export const generateDomainFromName = (name: string) => {
-  const normalizedName = name
-    .toLowerCase()
-    .trim()
-    .replace(/[\W_]+/g, "");
+  const normalizedName = slugify(name, { separator: "" });
   if (normalizedName.length < 3) {
     return "";
   }
@@ -221,26 +272,31 @@ export const getSubdomain = (name: string, apexName: string) => {
 export const getApexDomain = (url: string) => {
   let domain;
   try {
-    domain = new URL(url).hostname;
+    // replace any custom scheme (e.g. notion://) with https://
+    // use the URL constructor to get the hostname
+    domain = new URL(url.replace(/^[a-zA-Z]+:\/\//, "https://")).hostname;
   } catch (e) {
     return "";
   }
-  // special apex domains (e.g. youtu.be)
-  if (SPECIAL_APEX_DOMAINS[domain]) return SPECIAL_APEX_DOMAINS[domain];
+  if (domain === "youtu.be") return "youtube.com";
+  if (domain === "raw.githubusercontent.com") return "github.com";
+  if (domain.endsWith(".vercel.app")) return "vercel.app";
 
   const parts = domain.split(".");
   if (parts.length > 2) {
-    // if this is a second-level TLD (e.g. co.uk, .com.ua, .org.tt), we need to return the last 3 parts
     if (
-      SECOND_LEVEL_DOMAINS.has(parts[parts.length - 2]) &&
-      ccTLDs.has(parts[parts.length - 1])
+      // if this is a second-level TLD (e.g. co.uk, .com.ua, .org.tt), we need to return the last 3 parts
+      (SECOND_LEVEL_DOMAINS.has(parts[parts.length - 2]) &&
+        ccTLDs.has(parts[parts.length - 1])) ||
+      // if it's a special subdomain for website builders (e.g. weathergpt.vercel.app/)
+      SPECIAL_APEX_DOMAINS.has(parts.slice(-2).join("."))
     ) {
       return parts.slice(-3).join(".");
     }
     // otherwise, it's a subdomain (e.g. dub.vercel.app), so we return the last 2 parts
     return parts.slice(-2).join(".");
   }
-  // if it's a normal domain (e.g. dub.sh), we return the domain
+  // if it's a normal domain (e.g. dub.co), we return the domain
   return domain;
 };
 
@@ -251,16 +307,6 @@ export const isValidUrl = (url: string) => {
   } catch (e) {
     return false;
   }
-};
-
-export const isHomeHostname = (domain: string) => {
-  return HOME_HOSTNAMES.has(domain) || domain.endsWith(".vercel.app");
-};
-
-export const getDomain = (headers: Headers) => {
-  let domain = headers.get("host") as string;
-  if (isHomeHostname(domain)) domain = "dub.sh";
-  return domain;
 };
 
 export const getUrlFromString = (str: string) => {
@@ -298,11 +344,15 @@ export const getQueryString = (
   return `${queryString ? "?" : ""}${queryString}`;
 };
 
-export const setQueryString = (
-  router: NextRouter,
-  param: string,
-  value: string,
-) => {
+export const setQueryString = ({
+  router,
+  param,
+  value,
+}: {
+  router: NextRouter;
+  param: string;
+  value: string;
+}) => {
   if (param !== "page") delete router.query.page;
   let newQuery;
   if (value.length > 0) {
@@ -402,14 +452,23 @@ export async function generateMD5Hash(message) {
 const logTypeToEnv = {
   cron: process.env.DUB_SLACK_HOOK_CRON,
   links: process.env.DUB_SLACK_HOOK_LINKS,
-  error: process.env.DUB_SLACK_HOOK_ERROR,
 };
 
-export const log = async (
-  message: string,
-  type: "cron" | "links" | "error",
-  mention?: boolean,
-) => {
+export const log = async ({
+  message,
+  type,
+  mention = false,
+}: {
+  message: string;
+  type: "cron" | "links";
+  mention?: boolean;
+}) => {
+  if (
+    process.env.NODE_ENV === "development" ||
+    !process.env.DUB_SLACK_HOOK_CRON ||
+    !process.env.DUB_SLACK_HOOK_LINKS
+  )
+    console.log(message);
   /* Log a message to the console */
   const HOOK = logTypeToEnv[type];
   if (!HOOK) return;
@@ -436,44 +495,32 @@ export const log = async (
   }
 };
 
-export const isBlacklistedDomain = async (domain: string) => {
-  let blacklistedDomains;
-  try {
-    blacklistedDomains = await get("domains");
-  } catch (e) {
-    blacklistedDomains = [];
+export const deepEqual = (obj1: object, obj2: object) => {
+  if (obj1 === obj2) {
+    return true;
   }
-  return new RegExp(blacklistedDomains.join("|")).test(
-    getDomainWithoutWWW(domain) || domain,
-  );
-};
 
-export const isBlacklistedKey = async (key: string) => {
-  let blacklistedKeys;
-  try {
-    blacklistedKeys = await get("keys");
-  } catch (e) {
-    blacklistedKeys = [];
+  if (
+    typeof obj1 !== "object" ||
+    typeof obj2 !== "object" ||
+    obj1 === null ||
+    obj2 === null
+  ) {
+    return false;
   }
-  return new RegExp(blacklistedKeys.join("|"), "i").test(key);
-};
 
-export const isBlacklistedEmail = async (email: string) => {
-  let blacklistedEmails;
-  try {
-    blacklistedEmails = await get("emails");
-  } catch (e) {
-    blacklistedEmails = [];
-  }
-  return new RegExp(blacklistedEmails.join("|"), "i").test(email);
-};
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
 
-export const isReservedKey = async (key: string) => {
-  let reservedKey;
-  try {
-    reservedKey = await get("reserved");
-  } catch (e) {
-    reservedKey = [];
+  if (keys1.length !== keys2.length) {
+    return false;
   }
-  return new Set(reservedKey).has(key);
+
+  for (const key of keys1) {
+    if (!keys2.includes(key) || !deepEqual(obj1[key], obj2[key])) {
+      return false;
+    }
+  }
+
+  return true;
 };

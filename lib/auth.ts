@@ -1,8 +1,10 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import prisma from "#/lib/prisma";
-import { LinkProps, PlanProps, ProjectProps, UserProps } from "#/lib/types";
+import { type Link as LinkProps } from "@prisma/client";
+import { PlanProps, ProjectProps, UserProps } from "#/lib/types";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
+import { createHash } from "crypto";
 
 export interface Session {
   user: {
@@ -17,6 +19,11 @@ export async function getSession(req: NextApiRequest, res: NextApiResponse) {
   return (await getServerSession(req, res, authOptions)) as Session;
 }
 
+export const hashToken = (token: string) => {
+  return createHash("sha256")
+    .update(`${token}${process.env.NEXTAUTH_SECRET}`)
+    .digest("hex");
+};
 interface WithProjectNextApiHandler {
   (
     req: NextApiRequest,
@@ -32,10 +39,12 @@ const withProjectAuth =
     {
       excludeGet, // if the action doesn't need to be gated for GET requests
       requiredPlan = ["free", "pro", "enterprise"], // if the action needs a specific plan
+      requiredRole = ["owner", "member"],
       needNotExceededUsage, // if the action needs the user to not have exceeded their usage
     }: {
       excludeGet?: boolean;
       requiredPlan?: Array<PlanProps>;
+      requiredRole?: Array<"owner" | "member">;
       needNotExceededUsage?: boolean;
     } = {},
   ) =>
@@ -75,9 +84,9 @@ const withProjectAuth =
       },
     })) as ProjectProps;
 
-    if (project) {
+    if (project && project.users) {
       // project exists but user is not part of it
-      if (project.users && project.users.length === 0) {
+      if (project.users.length === 0) {
         const pendingInvites = await prisma.projectInvite.findUnique({
           where: {
             email_projectId: {
@@ -103,8 +112,21 @@ const withProjectAuth =
     }
 
     // if the action doesn't need to be gated for GET requests, return handler now
-    if (req.method === "GET" && excludeGet)
+    if (req.method === "GET" && excludeGet) {
       return handler(req, res, project, session);
+    }
+
+    if (
+      project.plan === "enterprise" &&
+      !requiredRole.includes(project.users[0].role) &&
+      // removing self from project should be allowed (DELETE /api/projects/[slug]/users?userId=...)
+      !(
+        req.url === `/api/projects/${slug}/users?userId=${session.user.id}` &&
+        req.method === "DELETE"
+      )
+    ) {
+      return res.status(403).end("Unauthorized: Insufficient permissions.");
+    }
 
     if (needNotExceededUsage && project.usage > project.usageLimit) {
       return res.status(403).end("Unauthorized: Usage limits exceeded.");

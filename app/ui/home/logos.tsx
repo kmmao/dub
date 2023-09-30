@@ -1,38 +1,19 @@
-import Link from "next/link";
 import BlurImage from "#/ui/blur-image";
-import { ExpandingArrow } from "#/ui/icons";
+import Link from "next/link";
 
 const logos = [
-  {
-    slug: "vercel",
-    link: "vercel.fyi",
-    dimensions: "h-5 sm:h-7",
-  },
-  {
-    slug: "tinybird",
-    link: "tbrd.co",
-    dimensions: "h-7 sm:h-10",
-  },
-  {
-    slug: "checkly",
-    link: "chkly.co",
-    dimensions: "h-6 sm:h-8",
-  },
-  {
-    slug: "cal",
-    link: "go.cal.com",
-    dimensions: "h-4 sm:h-6",
-  },
-  {
-    slug: "crowdin",
-    link: "l.crowdin.com",
-    dimensions: "h-6 sm:h-8",
-  },
-  {
-    slug: "lugg",
-    link: "short.lu.gg",
-    dimensions: "h-14 sm:h-20",
-  },
+  "vercel",
+  "prisma",
+  "tinybird",
+  "hashnode",
+  "cal",
+  "perplexity",
+  "replicate",
+  "super",
+  "chronicle",
+  "attio",
+  "crowd",
+  "checkly",
 ];
 
 export default function Logos({
@@ -41,33 +22,38 @@ export default function Logos({
   copy?: string;
 }) {
   return (
-    <div className="mt-20">
+    <div className="my-10">
       <p className="mx-auto max-w-sm text-center text-gray-600 sm:max-w-xl sm:text-lg">
         {copy}
       </p>
-      <div className="mx-auto mt-8 grid w-full max-w-screen-lg grid-cols-2 items-center gap-5 px-5 sm:grid-cols-6 sm:px-0">
-        {logos.map(({ slug, link, dimensions }) => (
-          <Link
-            key={slug}
-            href={`https://${link}`}
-            target="_blank"
-            rel="noopener noreferer"
-            className="group relative"
-          >
-            <div className="absolute z-10 flex h-full w-full translate-y-5 items-center justify-center opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
-              <p className="font-semibold text-gray-700">{link}</p>
-              <ExpandingArrow />
-            </div>
-            <BlurImage
-              src={`/_static/clients/${slug}.svg`}
-              alt={slug.toUpperCase()}
-              width={2418}
-              height={512}
-              className={`col-span-1 transition-all group-hover:opacity-20 group-hover:blur-sm ${dimensions}`}
-            />
-          </Link>
+      <Link
+        href="/customers"
+        className="mx-auto mt-8 grid w-full max-w-screen-lg grid-cols-2 items-center px-5 md:grid-cols-6 md:px-0"
+      >
+        {logos.slice(0, 6).map((logo) => (
+          <BlurImage
+            src={`/_static/clients/${logo}.svg`}
+            alt={logo.toUpperCase()}
+            width={520}
+            height={182}
+            className="h-12 grayscale transition-all hover:grayscale-0 md:h-20"
+          />
         ))}
-      </div>
+      </Link>
+      <Link
+        href="/customers"
+        className="mx-auto grid w-full max-w-screen-lg grid-cols-2 items-center px-5 md:grid-cols-6 md:px-0"
+      >
+        {logos.slice(6, 12).map((logo) => (
+          <BlurImage
+            src={`/_static/clients/${logo}.svg`}
+            alt={logo.toUpperCase()}
+            width={520}
+            height={182}
+            className="h-12 grayscale transition-all hover:grayscale-0 md:h-20"
+          />
+        ))}
+      </Link>
     </div>
   );
 }

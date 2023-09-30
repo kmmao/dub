@@ -1,6 +1,9 @@
-import type { NextRequest } from "next/server";
-import { setRandomKey } from "#/lib/upstash";
-import { isBlacklistedDomain } from "#/lib/utils";
+import { NextResponse, type NextRequest } from "next/server";
+import { ipAddress } from "@vercel/edge";
+import { LOCALHOST_IP } from "#/lib/constants";
+import { ratelimit, setRandomKey } from "#/lib/upstash";
+import { isValidUrl } from "#/lib/utils";
+import { isBlacklistedDomain } from "#/lib/edge-config";
 
 export const config = {
   runtime: "edge",
@@ -8,29 +11,37 @@ export const config = {
 
 export default async function handler(req: NextRequest) {
   if (req.method === "POST") {
-    const url = req.nextUrl.searchParams.get("url");
-    if (!url) {
-      return new Response(`Missing url`, { status: 400 });
+    const { url } = (await req.json()) as { url?: string };
+    if (!url || !isValidUrl(url)) {
+      return new Response("Invalid URL", { status: 400 });
     }
+
+    const ip = ipAddress(req) || LOCALHOST_IP;
+    const { success } = await ratelimit(5, "1 m").limit(ip);
+    if (!success) {
+      return new Response("Don't DDoS me pls 🥺", { status: 429 });
+    }
+
     const domainBlacklisted = await isBlacklistedDomain(url);
     if (domainBlacklisted) {
-      return new Response(`Invalid url`, { status: 400 });
+      return new Response("Invalid URL", { status: 400 });
     }
+
     const { response, key } = await setRandomKey(url);
     if (response === "OK") {
       // if key was successfully added
-      return new Response(
-        JSON.stringify({
+      return NextResponse.json(
+        {
           key,
           url,
-        }),
+        },
         { status: 200 },
       );
     } else {
-      return new Response(
-        JSON.stringify({
-          error: "failed to save link",
-        }),
+      return NextResponse.json(
+        {
+          error: "Failed to create link",
+        },
         { status: 500 },
       );
     }

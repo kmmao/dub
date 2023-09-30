@@ -1,17 +1,20 @@
 import SettingsLayout from "@/components/layout/app/settings-layout";
 import { useInviteTeammateModal } from "components/app/modals/invite-teammate-modal";
 import { useState } from "react";
-import { useRouter } from "next/router";
-import useSWR from "swr";
 import BlurImage from "#/ui/blur-image";
 import { UserProps } from "#/lib/types";
-import { fetcher, timeAgo } from "#/lib/utils";
-import Popover from "@/components/shared/popover";
+import { cn, timeAgo } from "#/lib/utils";
+import Popover from "#/ui/popover";
 import IconMenu from "@/components/shared/icon-menu";
 import { UserMinus } from "lucide-react";
 import { ThreeDots } from "@/components/shared/icons";
 import { useRemoveTeammateModal } from "@/components/app/modals/remove-teammate-modal";
 import Badge from "#/ui/badge";
+import useUsers from "#/lib/swr/use-users";
+import { useSession } from "next-auth/react";
+import { useEditRoleModal } from "@/components/app/modals/edit-role-modal";
+import useProject from "#/lib/swr/use-project";
+import Avatar from "#/ui/avatar";
 
 const tabs: Array<"Members" | "Invitations"> = ["Members", "Invitations"];
 
@@ -19,19 +22,11 @@ export default function ProjectSettingsPeople() {
   const { setShowInviteTeammateModal, InviteTeammateModal } =
     useInviteTeammateModal();
 
-  const router = useRouter();
-  const { slug } = router.query as { slug?: string };
   const [currentTab, setCurrentTab] = useState<"Members" | "Invitations">(
     "Members",
   );
 
-  const { data: users } = useSWR<UserProps[]>(
-    slug &&
-      (currentTab === "Members"
-        ? `/api/projects/${slug}/users`
-        : `/api/projects/${slug}/invites`),
-    fetcher,
-  );
+  const { users } = useUsers({ invites: currentTab === "Invitations" });
 
   return (
     <SettingsLayout>
@@ -41,7 +36,7 @@ export default function ProjectSettingsPeople() {
           <div className="flex flex-col space-y-3">
             <h2 className="text-xl font-medium">People</h2>
             <p className="text-sm text-gray-500">
-              Teammates or friends that have access to this project.
+              Teammates that have access to this project.
             </p>
           </div>
           <button
@@ -107,19 +102,32 @@ const UserCard = ({
   currentTab: "Members" | "Invitations";
 }) => {
   const [openPopover, setOpenPopover] = useState(false);
+
+  const { plan, isOwner } = useProject();
+
+  const { name, email, createdAt, role: currentRole } = user;
+
+  const [role, setRole] = useState<"owner" | "member">(currentRole);
+
+  const { EditRoleModal, setShowEditRoleModal } = useEditRoleModal({
+    user,
+    role,
+  });
+
   const { RemoveTeammateModal, setShowRemoveTeammateModal } =
     useRemoveTeammateModal({ user, invite: currentTab === "Invitations" });
 
-  const { name, email, image, joinedAt } = user;
+  const { data: session } = useSession();
 
   // invites expire after 14 days of being sent
   const expiredInvite =
     currentTab === "Invitations" &&
-    joinedAt &&
-    Date.now() - new Date(joinedAt).getTime() > 14 * 24 * 60 * 60 * 1000;
+    createdAt &&
+    Date.now() - new Date(createdAt).getTime() > 14 * 24 * 60 * 60 * 1000;
 
   return (
     <>
+      <EditRoleModal />
       <RemoveTeammateModal />
       <div
         key={email}
@@ -127,15 +135,7 @@ const UserCard = ({
       >
         <div className="flex items-start space-x-3">
           <div className="flex items-center space-x-3">
-            <BlurImage
-              src={
-                image || `https://avatars.dicebear.com/api/micah/${email}.svg`
-              }
-              alt={email}
-              width={40}
-              height={40}
-              className="overflow-hidden rounded-full border border-gray-200"
-            />
+            <Avatar user={user} />
             <div className="flex flex-col">
               <h3 className="text-sm font-medium">{name || email}</h3>
               <p className="text-xs text-gray-500">{email}</p>
@@ -145,10 +145,35 @@ const UserCard = ({
           {expiredInvite && <Badge variant="gray" text="Expired" />}
         </div>
         <div className="flex items-center space-x-3">
-          <p className="text-xs text-gray-500">
-            {currentTab === "Members" ? "Joined " : "Invited "}
-            {timeAgo(joinedAt)}
-          </p>
+          {currentTab === "Members" ? (
+            session?.user?.email === email ? (
+              <p className="text-xs capitalize text-gray-500">{role}</p>
+            ) : (
+              <select
+                className={cn(
+                  "rounded-md border border-gray-200 text-xs text-gray-500 focus:border-gray-600 focus:ring-gray-600",
+                  {
+                    "cursor-not-allowed bg-gray-100":
+                      plan === "enterprise" && !isOwner,
+                  },
+                )}
+                value={role}
+                disabled={plan === "enterprise" && !isOwner}
+                onChange={(e) => {
+                  setRole(e.target.value as "owner" | "member");
+                  setOpenPopover(false);
+                  setShowEditRoleModal(true);
+                }}
+              >
+                <option value="owner">Owner</option>
+                <option value="member">Member</option>
+              </select>
+            )
+          ) : (
+            <p className="text-xs text-gray-500">
+              Invited {timeAgo(createdAt)}
+            </p>
+          )}
 
           <Popover
             content={
@@ -161,7 +186,13 @@ const UserCard = ({
                   className="rounded-md p-2 text-left text-sm font-medium text-red-600 transition-all duration-75 hover:bg-red-600 hover:text-white"
                 >
                   <IconMenu
-                    text="Remove"
+                    text={
+                      session?.user?.email === email
+                        ? "Leave project"
+                        : currentTab === "Members"
+                        ? "Remove teammate"
+                        : "Revoke invite"
+                    }
                     icon={<UserMinus className="h-4 w-4" />}
                   />
                 </button>

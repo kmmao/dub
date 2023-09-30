@@ -1,7 +1,12 @@
 import prisma from "#/lib/prisma";
 import { redis } from "#/lib/upstash";
 import cloudinary from "cloudinary";
-import { getApexDomain, validDomainRegex } from "#/lib/utils";
+import {
+  getApexDomain,
+  getDomainWithoutWWW,
+  validDomainRegex,
+} from "#/lib/utils";
+import { isIframeable } from "../middleware/utils";
 
 export const validateDomain = async (
   domain: string,
@@ -11,7 +16,9 @@ export const validateDomain = async (
     return "Missing domain";
   }
   const validDomain =
-    validDomainRegex.test(domain) && !domain.endsWith(".dub.sh");
+    validDomainRegex.test(domain) &&
+    // make sure the domain doesn't contain dub.co/dub.sh
+    !/^(dub\.co|.*\.dub\.co|dub\.sh|.*\.dub\.sh)$/i.test(domain);
 
   if (!validDomain) {
     return "Invalid domain";
@@ -64,16 +71,26 @@ interface CustomResponse extends Response {
 
 export const addDomainToVercel = async (
   domain: string,
+  {
+    redirectToApex,
+  }: {
+    redirectToApex?: boolean;
+  } = {},
 ): Promise<CustomResponse> => {
   return await fetch(
-    `https://api.vercel.com/v9/projects/${process.env.PROJECT_ID_VERCEL}/domains?teamId=${process.env.TEAM_ID_VERCEL}`,
+    `https://api.vercel.com/v10/projects/${process.env.PROJECT_ID_VERCEL}/domains?teamId=${process.env.TEAM_ID_VERCEL}`,
     {
-      body: `{\n  "name": "${domain}"\n}`,
+      method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.AUTH_BEARER_TOKEN}`,
         "Content-Type": "application/json",
       },
-      method: "POST",
+      body: JSON.stringify({
+        name: domain,
+        ...(redirectToApex && {
+          redirect: getDomainWithoutWWW(domain),
+        }),
+      }),
     },
   ).then((res) => res.json());
 };
@@ -162,19 +179,36 @@ export const verifyDomain = async (domain: string) => {
   ).then((res) => res.json());
 };
 
-export async function setRootDomain(
-  domain: string,
-  target: string,
-  rewrite: boolean,
-  newDomain?: string, // if the domain is changed, this will be the new domain
-) {
+export async function setRootDomain({
+  domain,
+  target,
+  rewrite,
+  newDomain,
+}: {
+  domain: string;
+  target: string;
+  rewrite: boolean;
+  newDomain?: string; // if the domain is changed, this will be the new domain
+}) {
   if (newDomain) {
     const pipeline = redis.pipeline();
     pipeline.del(`root:${domain}`);
-    pipeline.set(`root:${newDomain}`, { target, rewrite });
+    pipeline.set(`root:${newDomain}`, {
+      target,
+      ...(rewrite && {
+        rewrite: true,
+        iframeable: await isIframeable({ url: target, requestDomain: domain }),
+      }),
+    });
     return await pipeline.exec();
   } else {
-    await redis.set(`root:${domain}`, { target, rewrite });
+    await redis.set(`root:${domain}`, {
+      target,
+      ...(rewrite && {
+        rewrite: true,
+        iframeable: await isIframeable({ url: target, requestDomain: domain }),
+      }),
+    });
   }
 }
 
@@ -229,7 +263,13 @@ export async function changeDomainForImages(domain: string, newDomain: string) {
 }
 
 /* Delete a domain and all links & images associated with with */
-export async function deleteDomainAndLinks(domain: string) {
+export async function deleteDomainAndLinks(
+  domain: string,
+  {
+    // Note: in certain cases, we don't need to remove the domain from the Prisma
+    skipPrismaDelete = false,
+  } = {},
+) {
   const links = await prisma.link.findMany({
     where: {
       domain,
@@ -246,11 +286,11 @@ export async function deleteDomainAndLinks(domain: string) {
     cloudinary.v2.api.delete_resources_by_prefix(domain),
     // remove the domain from Vercel
     removeDomainFromVercel(domain),
-    // remove the domain from the database
-    prisma.domain.delete({
-      where: {
-        slug: domain,
-      },
-    }),
+    !skipPrismaDelete &&
+      prisma.domain.delete({
+        where: {
+          slug: domain,
+        },
+      }),
   ]);
 }

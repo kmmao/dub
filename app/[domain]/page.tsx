@@ -1,4 +1,5 @@
 import prisma from "#/lib/prisma";
+import { constructMetadata } from "#/lib/utils";
 import PlaceholderContent from "./placeholder";
 
 export async function generateMetadata({
@@ -6,23 +7,13 @@ export async function generateMetadata({
 }: {
   params: { domain: string };
 }) {
-  const title = `${params.domain.toUpperCase()} - A Dub.sh Custom Domain`;
+  const title = `${params.domain.toUpperCase()} - A Dub.co Custom Domain`;
   const description = `${params.domain.toUpperCase()} is a custom domain on Dub - an open-source link management tool for modern marketing teams to create, share, and track short links.`;
 
-  return {
+  return constructMetadata({
     title,
     description,
-    openGraph: {
-      title,
-      description,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      creator: "@dubdotsh",
-    },
-  };
+  });
 }
 
 export async function generateStaticParams() {
@@ -32,6 +23,9 @@ export async function generateStaticParams() {
           where: {
             verified: true,
             target: null,
+            NOT: {
+              slug: "dub.sh",
+            },
           },
           select: {
             slug: true,

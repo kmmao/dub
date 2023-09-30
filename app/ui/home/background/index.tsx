@@ -2,18 +2,17 @@
 
 import { useSelectedLayoutSegment } from "next/navigation";
 import styles from "./background.module.css";
-
-const showBackgroundSegments = new Set(["metatags", "pricing"]);
+import { SHOW_BACKGROUND_SEGMENTS } from "#/lib/constants";
 
 export default function Background() {
   let segment;
   try {
     segment = useSelectedLayoutSegment();
   } catch (e) {
-    // this is for /login and /signup which are still on /pages router
+    // this is for /welcome which is still on /pages router
   }
 
-  return !segment || showBackgroundSegments.has(segment) ? (
+  return !segment || SHOW_BACKGROUND_SEGMENTS.includes(segment) ? (
     <div className={styles.main}>
       <div className={styles.content} />
     </div>

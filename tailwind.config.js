@@ -1,6 +1,4 @@
 /** @type {import('tailwindcss').Config} */
-const plugin = require("tailwindcss/plugin");
-
 module.exports = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx}",
@@ -12,6 +10,17 @@ module.exports = {
   },
   theme: {
     extend: {
+      screens: {
+        xs: "420px",
+      },
+      typography: {
+        DEFAULT: {
+          css: {
+            "blockquote p:first-of-type::before": { content: "none" },
+            "blockquote p:first-of-type::after": { content: "none" },
+          },
+        },
+      },
       fontFamily: {
         display: ["var(--font-satoshi)", "system-ui", "sans-serif"],
         default: ["var(--font-inter)", "system-ui", "sans-serif"],
@@ -19,6 +28,7 @@ module.exports = {
       animation: {
         // Modal
         "scale-in": "scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        "fade-in": "fade-in 0.3s ease-out forwards",
         // Input Select
         "input-select-slide-up":
           "input-select-slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -48,6 +58,10 @@ module.exports = {
         "scale-in": {
           "0%": { transform: "scale(0.95)" },
           "100%": { transform: "scale(1)" },
+        },
+        "fade-in": {
+          "0%": { opacity: 0 },
+          "100%": { opacity: 1 },
         },
         // Input Select
         "input-select-slide-up": {

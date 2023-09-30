@@ -56,7 +56,7 @@ export async function recordClick(
     ...(key && conn
       ? [
           conn.execute(
-            "UPDATE Link SET clicks = clicks + 1 WHERE domain = ? AND `key` = ?",
+            "UPDATE Link SET clicks = clicks + 1, lastClicked = NOW() WHERE domain = ? AND `key` = ?",
             [domain, key],
           ),
           conn.execute(
@@ -66,4 +66,24 @@ export async function recordClick(
         ]
       : []),
   ]);
+}
+
+export async function getTopLinks(domains: string[]) {
+  return await fetch(
+    `https://api.us-east.tinybird.co/v0/pipes/top_links.json?domains=${domains.join(
+      ",",
+    )}`,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.TINYBIRD_API_KEY}`,
+      },
+    },
+  )
+    .then((res) => res.json())
+    .then(({ data }) =>
+      data.map((link: { domain: string; key: string; clicks: number }) => ({
+        link: `${link.domain}/${link.key}`,
+        clicks: link.clicks,
+      })),
+    );
 }

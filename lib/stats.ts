@@ -51,7 +51,7 @@ export const intervalData = {
     granularity: "month",
   },
   all: {
-    // Dub.sh founding date
+    // Dub.co founding date
     startDate: new Date("2022-09-22"),
     granularity: "month",
   },
@@ -117,12 +117,14 @@ export const getStats = async ({
   endpoint: string;
   interval?: string | null;
 }) => {
-  if (!process.env.TINYBIRD_API_KEY) {
-    return null;
-  }
+  // Note: we're using decodeURIComponent in this function because that's how we store it in MySQL and Tinybird
 
-  if (!VALID_TINYBIRD_ENDPOINTS.has(endpoint)) {
-    return null;
+  if (
+    !conn ||
+    !process.env.TINYBIRD_API_KEY ||
+    !VALID_TINYBIRD_ENDPOINTS.has(endpoint)
+  ) {
+    return [];
   }
 
   // get all-time clicks count if:
@@ -133,7 +135,7 @@ export const getStats = async ({
   if (endpoint === "clicks" && key !== "_root" && !interval && conn) {
     const response = await conn.execute(
       "SELECT clicks FROM Link WHERE domain = ? AND `key` = ?",
-      [domain, key],
+      [domain, decodeURIComponent(key)],
     );
     try {
       const clicks = response.rows[0]["clicks"];
@@ -147,7 +149,7 @@ export const getStats = async ({
     `https://api.us-east.tinybird.co/v0/pipes/${endpoint}.json`,
   );
   url.searchParams.append("domain", domain);
-  url.searchParams.append("key", key);
+  url.searchParams.append("key", decodeURIComponent(key));
 
   if (interval) {
     url.searchParams.append(

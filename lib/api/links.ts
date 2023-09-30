@@ -1,16 +1,12 @@
 import cloudinary from "cloudinary";
 import { DEFAULT_REDIRECTS } from "#/lib/constants";
 import prisma from "#/lib/prisma";
-import { LinkProps } from "#/lib/types";
+import { type Link as LinkProps } from "@prisma/client";
 import { redis } from "#/lib/upstash";
-import {
-  getParamsFromURL,
-  isReservedKey,
-  nanoid,
-  truncate,
-  validKeyRegex,
-} from "#/lib/utils";
+import { getParamsFromURL, nanoid, truncate, validKeyRegex } from "#/lib/utils";
+import { isReservedKey } from "#/lib/edge-config";
 import { NextApiRequest } from "next";
+import { isIframeable } from "../middleware/utils";
 
 export async function getLinksForProject({
   projectId,
@@ -18,6 +14,7 @@ export async function getLinksForProject({
   tagId,
   search,
   sort = "createdAt",
+  page,
   userId,
   showArchived,
 }: {
@@ -25,29 +22,42 @@ export async function getLinksForProject({
   domain?: string;
   tagId?: string;
   search?: string;
-  sort?: "createdAt" | "clicks"; // always descending for both
+  sort?: "createdAt" | "clicks" | "lastClicked"; // descending for all
+  page?: string;
   userId?: string | null;
   showArchived?: boolean;
 }): Promise<LinkProps[]> {
-  /*
-  TODO: add pagination
-  */
   return await prisma.link.findMany({
     where: {
       projectId,
       archived: showArchived ? undefined : false,
       ...(domain && { domain }),
       ...(search && {
-        key: { search },
-        url: { search },
+        OR: [
+          // Use MySQL fullTextSearch for search queries longer than 4 characters, else use exact matches
+          {
+            key: search.length > 4 ? { search } : { contains: search },
+          },
+          search.length > 4
+            ? {
+                url: { search },
+              }
+            : {},
+        ],
       }),
       ...(tagId && { tagId }),
       ...(userId && { userId }),
+    },
+    include: {
+      user: true,
     },
     orderBy: {
       [sort]: "desc",
     },
     take: 100,
+    ...(page && {
+      skip: (parseInt(page) - 1) * 100,
+    }),
   });
 }
 
@@ -76,8 +86,17 @@ export async function getLinksCount({
         archived: showArchived ? undefined : false,
         ...(userId && { userId }),
         ...(search && {
-          key: { search },
-          url: { search },
+          OR: [
+            // Use MySQL fullTextSearch for search queries longer than 4 characters, else use exact matches
+            {
+              key: search.length > 4 ? { search } : { contains: search },
+            },
+            search.length > 4
+              ? {
+                  url: { search },
+                }
+              : {},
+          ],
         }),
         // when filtering by domain, only filter by domain if the filter group is not "Domains"
         ...(domain &&
@@ -107,11 +126,14 @@ export async function getLinksCount({
     return await prisma.link.count({
       where: {
         projectId,
+        archived: showArchived ? undefined : false,
         ...(userId && { userId }),
         ...(search && {
           key: { search },
           url: { search },
         }),
+        ...(domain && { domain }),
+        ...(tagId && { tagId }),
       },
     });
   }
@@ -177,8 +199,10 @@ export async function addLink(link: LinkProps) {
     description,
     image,
     proxy,
+    rewrite,
     ios,
     android,
+    geo,
   } = link;
   const hasPassword = password && password.length > 0 ? true : false;
   const exat = expiresAt ? new Date(expiresAt).getTime() / 1000 : null;
@@ -203,6 +227,7 @@ export async function addLink(link: LinkProps) {
         utm_campaign,
         utm_term,
         utm_content,
+        geo: geo || undefined,
       },
     }),
     redis.set(
@@ -211,8 +236,13 @@ export async function addLink(link: LinkProps) {
         url: encodeURIComponent(url),
         password: hasPassword,
         proxy,
-        ios,
-        android,
+        ...(rewrite && {
+          rewrite: true,
+          iframeable: await isIframeable({ url, requestDomain: domain }),
+        }),
+        ...(ios && { ios }),
+        ...(android && { android }),
+        ...(geo && { geo }),
       },
       {
         nx: true,
@@ -261,8 +291,10 @@ export async function editLink(
     description,
     image,
     proxy,
+    rewrite,
     ios,
     android,
+    geo,
   } = link;
   const hasPassword = password && password.length > 0 ? true : false;
   const exat = expiresAt ? new Date(expiresAt).getTime() : null;
@@ -293,6 +325,7 @@ export async function editLink(
         utm_campaign,
         utm_term,
         utm_content,
+        geo: geo || undefined,
       },
     }),
     // only upload image to cloudinary if proxy is true and there's an image
@@ -312,8 +345,13 @@ export async function editLink(
         url: encodeURIComponent(url),
         password: hasPassword,
         proxy,
-        ios,
-        android,
+        ...(rewrite && {
+          rewrite: true,
+          iframeable: await isIframeable({ url, requestDomain: domain }),
+        }),
+        ...(ios && { ios }),
+        ...(android && { android }),
+        ...(geo && { geo }),
       },
       exat ? { exat } : {},
     ),

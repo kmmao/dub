@@ -1,7 +1,7 @@
 import BlurImage from "#/ui/blur-image";
 import { Facebook, LinkedIn, Photo, Twitter } from "@/components/shared/icons";
 import { LoadingCircle } from "#/ui/icons";
-import { LinkProps } from "#/lib/types";
+import { type Link as LinkProps } from "@prisma/client";
 import { getDomainWithoutWWW } from "#/lib/utils";
 import { useMemo } from "react";
 import { useDebounce } from "use-debounce";
@@ -16,7 +16,7 @@ export default function Preview({
   const { title, description, image, url, password } = data;
   const [debouncedUrl] = useDebounce(url, 500);
   const hostname = useMemo(() => {
-    if (password) return "dub.sh";
+    if (password) return "dub.co";
     return getDomainWithoutWWW(debouncedUrl);
   }, [password, debouncedUrl]);
 

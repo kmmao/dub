@@ -1,7 +1,7 @@
 import { addLink, getLinksForProject, processKey } from "#/lib/api/links";
 import { withLinksAuth } from "#/lib/auth";
-import { isBlacklistedDomain, isBlacklistedKey } from "#/lib/utils";
-import { log } from "#/lib/utils";
+import { isBlacklistedDomain, isBlacklistedKey } from "#/lib/edge-config";
+import { getApexDomain, log } from "#/lib/utils";
 import { DUB_PROJECT_ID, GOOGLE_FAVICON_URL } from "#/lib/constants";
 
 export const config = {
@@ -17,14 +17,15 @@ export default withLinksAuth(
     // GET /api/links – get all links for a project
     // if no project, get all dub.sh links for user
     if (req.method === "GET") {
-      const { domain, tagId, search, sort, userId, showArchived } =
+      const { domain, tagId, search, sort, page, userId, showArchived } =
         req.query as {
           domain?: string;
           tagId?: string;
           search?: string;
           sort?: "createdAt" | "clicks";
+          page?: string;
           userId?: string;
-          showArchived?: boolean;
+          showArchived?: string;
         };
       const response = await getLinksForProject({
         projectId: project?.id || DUB_PROJECT_ID,
@@ -32,14 +33,15 @@ export default withLinksAuth(
         tagId,
         search,
         sort,
+        page,
         userId: project?.id ? userId : session.user.id,
-        showArchived,
+        showArchived: showArchived === "true" ? true : false,
       });
       return res.status(200).json(response);
 
       // POST /api/links – create a new link
     } else if (req.method === "POST") {
-      let { domain, key, url } = req.body;
+      let { domain, key, url, rewrite, geo } = req.body;
       if (!domain || !key || !url) {
         return res.status(400).end("Missing domain or key or url.");
       }
@@ -57,6 +59,20 @@ export default withLinksAuth(
         if (domainBlacklisted) {
           return res.status(422).end("Invalid url.");
         }
+        if (rewrite) {
+          return res
+            .status(403)
+            .end("You can only use link cloaking on a custom domain.");
+        }
+      }
+
+      // free plan restrictions
+      if (!project || project.plan === "free") {
+        if (geo) {
+          return res
+            .status(403)
+            .end("You can only use geo targeting on a Pro plan.");
+        }
       }
 
       key = processKey(key);
@@ -72,7 +88,11 @@ export default withLinksAuth(
           userId: session.user.id,
         }),
         ...(!project
-          ? [fetch(`${GOOGLE_FAVICON_URL}${url}`).then((res) => !res.ok)]
+          ? [
+              fetch(`${GOOGLE_FAVICON_URL}${getApexDomain(url)}`).then(
+                (res) => !res.ok,
+              ),
+            ]
           : []),
         // @ts-ignore
       ]).then((results) => results.map((result) => result.value));
@@ -82,17 +102,17 @@ export default withLinksAuth(
       }
 
       if (!project && invalidFavicon) {
-        await log(
-          `*${
+        await log({
+          message: `*${
             session.user.email
           }* created a new link (dub.sh/${key}) for ${url} ${
             invalidFavicon
               ? " but it has an invalid favicon :thinking_face:"
               : ""
           }`,
-          "links",
-          invalidFavicon ? true : false,
-        );
+          type: "links",
+          mention: true,
+        });
       }
 
       return res.status(200).json(response);

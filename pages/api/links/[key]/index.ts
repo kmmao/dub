@@ -1,6 +1,7 @@
 import { withLinksAuth } from "#/lib/auth";
 import { deleteLink, editLink, processKey } from "#/lib/api/links";
-import { isBlacklistedDomain, isBlacklistedKey, log } from "#/lib/utils";
+import { isBlacklistedDomain, isBlacklistedKey } from "#/lib/edge-config";
+import { getApexDomain, log } from "#/lib/utils";
 import { GOOGLE_FAVICON_URL } from "#/lib/constants";
 
 export const config = {
@@ -24,7 +25,7 @@ export default withLinksAuth(
 
       // PUT /api/links/:key – edit a link
     } else if (req.method === "PUT") {
-      let { domain, key, url } = req.body;
+      let { domain, key, url, rewrite } = req.body;
       if (!domain || !key || !url) {
         return res.status(400).end("Missing domain or key or url.");
       }
@@ -40,6 +41,11 @@ export default withLinksAuth(
         const domainBlacklisted = await isBlacklistedDomain(url);
         if (domainBlacklisted) {
           return res.status(422).end("Invalid url.");
+        }
+        if (rewrite) {
+          return res
+            .status(403)
+            .end("You can only use link cloaking on a custom domain.");
         }
       }
 
@@ -62,7 +68,11 @@ export default withLinksAuth(
           },
         ),
         ...(!project
-          ? [fetch(`${GOOGLE_FAVICON_URL}${url}`).then((res) => !res.ok)]
+          ? [
+              fetch(`${GOOGLE_FAVICON_URL}${getApexDomain(url)}`).then(
+                (res) => !res.ok,
+              ),
+            ]
           : []),
         // @ts-ignore
       ]).then((results) => results.map((result) => result.value));
@@ -72,17 +82,17 @@ export default withLinksAuth(
       }
 
       if (!project && invalidFavicon) {
-        await log(
-          `*${
+        await log({
+          message: `*${
             session.user.email
           }* edited a link (dub.sh/${key}) to the ${url} ${
             invalidFavicon
               ? " but it has an invalid favicon :thinking_face:"
               : ""
           }`,
-          "links",
-          invalidFavicon ? true : false,
-        );
+          type: "links",
+          mention: true,
+        });
       }
       return res.status(200).json(response);
 

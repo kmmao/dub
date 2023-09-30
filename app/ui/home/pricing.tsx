@@ -3,17 +3,14 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import Confetti from "react-dom-confetti";
-import {
-  CheckCircleFill,
-  QuestionCircle,
-  XCircleFill,
-} from "@/components/shared/icons";
+import { CheckCircleFill, XCircleFill } from "@/components/shared/icons";
 import MaxWidthWrapper from "@/components/shared/max-width-wrapper";
 import Switch from "#/ui/switch";
-import Tooltip from "#/ui/tooltip";
-import { PLANS } from "#/lib/stripe/constants";
+import Tooltip, { SimpleTooltipContent } from "#/ui/tooltip";
+import { PLANS } from "#/lib/stripe/utils";
 import { nFormatter } from "#/lib/utils";
-import { MinusCircle } from "lucide-react";
+import { HelpCircle, MinusCircle } from "lucide-react";
+import { APP_DOMAIN } from "#/lib/constants";
 
 const pricingItems = [
   {
@@ -30,19 +27,40 @@ const pricingItems = [
       },
       {
         text: "Advanced link features",
-        footnote:
-          "Password protection, link expiration, device targeting, custom social media cards, etc.",
+        footnote: (
+          <SimpleTooltipContent
+            title="Password protection, link expiration, device targeting, custom social media cards, etc."
+            cta="Learn more."
+            href="/help/article/how-to-create-link#the-dub-link-builder"
+          />
+        ),
       },
       { text: "Up to 3 users", neutral: true },
       { text: "30-day link history", neutral: true },
       {
         text: "Root domain redirect",
-        footnote:
-          "Redirect vistors that land on the root of your domain (e.g. yourdomain.com) to a page of your choice.",
+        footnote: (
+          <SimpleTooltipContent
+            title="Redirect vistors that land on the root of your domain (e.g. yourdomain.com) to a page of your choice."
+            cta="Learn more."
+            href="/help/article/how-to-redirect-root-domain"
+          />
+        ),
         negative: true,
       },
       {
         text: "Custom QR Code Logo",
+        footnote: (
+          <SimpleTooltipContent
+            title="Set a custom logo for your links' QR codes."
+            cta="Learn more."
+            href="/help/article/custom-qr-codes"
+          />
+        ),
+        negative: true,
+      },
+      {
+        text: "API Access",
         negative: true,
       },
       { text: "SSO/SAML", negative: true },
@@ -64,18 +82,39 @@ const pricingItems = [
       },
       {
         text: "Advanced link features",
-        footnote:
-          "Password protection, link expiration, device targeting, custom social media cards, etc.",
+        footnote: (
+          <SimpleTooltipContent
+            title="Password protection, link expiration, device targeting, custom social media cards, etc."
+            cta="Learn more."
+            href="/help/article/how-to-create-link#the-dub-link-builder"
+          />
+        ),
       },
       { text: "Unlimited users" },
       { text: "Unlimited link history" },
       {
         text: "Root domain redirect",
-        footnote:
-          "Redirect visitors that land on the root of your domain (e.g. yourdomain.com) to a page of your choice.",
+        footnote: (
+          <SimpleTooltipContent
+            title="Redirect vistors that land on the root of your domain (e.g. yourdomain.com) to a page of your choice."
+            cta="Learn more."
+            href="/help/article/how-to-redirect-root-domain"
+          />
+        ),
       },
       {
         text: "Custom QR Code Logo",
+        footnote: (
+          <SimpleTooltipContent
+            title="Set a custom logo for your links' QR codes."
+            cta="Learn more."
+            href="/help/article/custom-qr-codes"
+          />
+        ),
+      },
+      {
+        text: "API Access",
+        footnote: "Under development. ETA: September 2023",
       },
       { text: "SSO/SAML", negative: true },
       { text: "Priority support", negative: true },
@@ -96,20 +135,41 @@ const pricingItems = [
       },
       {
         text: "Advanced link features",
-        footnote:
-          "Password protection, link expiration, device targeting, custom social media cards, etc.",
+        footnote: (
+          <SimpleTooltipContent
+            title="Password protection, link expiration, device targeting, custom social media cards, etc."
+            cta="Learn more."
+            href="/help/article/how-to-create-link#the-dub-link-builder"
+          />
+        ),
       },
       { text: "Unlimited users" },
       { text: "Unlimited link history" },
       {
         text: "Root domain redirect",
-        footnote:
-          "Redirect visitors that land on the root of your domain (e.g. yourdomain.com) to a page of your choice.",
+        footnote: (
+          <SimpleTooltipContent
+            title="Redirect vistors that land on the root of your domain (e.g. yourdomain.com) to a page of your choice."
+            cta="Learn more."
+            href="/help/article/how-to-redirect-root-domain"
+          />
+        ),
       },
       {
         text: "Custom QR Code Logo",
+        footnote: (
+          <SimpleTooltipContent
+            title="Set a custom logo for your links' QR codes."
+            cta="Learn more."
+            href="/help/article/custom-qr-codes"
+          />
+        ),
       },
-      { text: "SSO/SAML", footnote: "Under development. ETA: Q4 2023" },
+      {
+        text: "API Access",
+        footnote: "Under development. ETA: September 2023",
+      },
+      { text: "SSO/SAML" },
       {
         text: "Priority support",
         footnote: "Email & chat support within 24 hours.",
@@ -187,14 +247,14 @@ const Pricing = () => {
                 </h3>
                 <p className="text-gray-500">{tagline}</p>
                 <p className="my-5 font-display text-6xl font-semibold">
-                  ${period === "yearly" ? nFormatter(price / 12, 1) : price}
+                  ${period === "yearly" ? nFormatter(price / 12) : price}
                 </p>
                 <p className="text-gray-500">
                   per {period === "yearly" ? "month, billed annually" : "month"}
                 </p>
               </div>
               <div className="flex h-20 items-center justify-center border-b border-t border-gray-200 bg-gray-50">
-                <div className="flex items-center">
+                <div className="flex items-center space-x-1">
                   <p className="text-gray-600">
                     {plan === "Enterprise"
                       ? "Unlimited link clicks"
@@ -202,9 +262,7 @@ const Pricing = () => {
                   </p>
                   {plan !== "Enterprise" && (
                     <Tooltip content="If you exceed your monthly usage, your existing links will still work, but you need to upgrade to view their stats/add more links.">
-                      <div className="flex h-4 w-8 justify-center">
-                        <QuestionCircle className="h-4 w-4 text-gray-600" />
-                      </div>
+                      <HelpCircle className="h-4 w-4 text-gray-600" />
                     </Tooltip>
                   )}
                 </div>
@@ -225,7 +283,7 @@ const Pricing = () => {
                       )}
                     </div>
                     {footnote ? (
-                      <div className="flex items-center">
+                      <div className="flex items-center space-x-1">
                         <p
                           className={
                             negative ? "text-gray-400" : "text-gray-600"
@@ -234,9 +292,7 @@ const Pricing = () => {
                           {text}
                         </p>
                         <Tooltip content={footnote}>
-                          <div className="flex h-4 w-8 justify-center">
-                            <QuestionCircle className="h-4 w-4 text-gray-600" />
-                          </div>
+                          <HelpCircle className="h-4 w-4 text-gray-600" />
                         </Tooltip>
                       </div>
                     ) : (
@@ -252,11 +308,7 @@ const Pricing = () => {
               <div className="border-t border-gray-200" />
               <div className="p-5">
                 <Link
-                  href={
-                    process.env.NODE_ENV === "production"
-                      ? "https://app.dub.sh/register"
-                      : "http://app.localhost:3000/register"
-                  }
+                  href={`${APP_DOMAIN}/register`}
                   className={`${
                     plan === "Pro"
                       ? "border border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:border-blue-700 hover:bg-white hover:bg-clip-text hover:text-transparent"

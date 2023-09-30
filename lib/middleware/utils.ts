@@ -1,27 +1,44 @@
 import { NextRequest } from "next/server";
-import { isHomeHostname } from "../utils";
 
 export const parse = (req: NextRequest) => {
   let domain = req.headers.get("host") as string;
   domain = domain.replace("www.", ""); // remove www. from domain
-  if (isHomeHostname(domain)) domain = "dub.sh"; // if domain is a home hostname, set it to dub.sh
+  if (domain === "dub.localhost:8888" || domain === "staging.dub.sh") {
+    // for local development and staging environments
+    domain = "dub.sh";
+  }
 
-  // path is the path of the URL (e.g. dub.sh/stats/github -> /stats/github)
-  const path = req.nextUrl.pathname;
+  // path is the path of the URL (e.g. dub.co/stats/github -> /stats/github)
+  let path = req.nextUrl.pathname;
+
+  // special case for dub.sh/___dub_check/ (for checking if dub.sh links are working)
+  if (path.startsWith("/___dub_check/")) {
+    domain = "dub.sh";
+    path = path.replace("/___dub_check/", "/");
+  }
+
+  // fullPath is the full URL path (along with search params)
+  const searchParams = req.nextUrl.searchParams.toString();
+  const fullPath = `${path}${
+    searchParams.length > 0 ? `?${searchParams}` : ""
+  }`;
 
   // Here, we are using decodeURIComponent to handle foreign languages like Hebrew
-  const key = decodeURIComponent(path.split("/")[1]); // key is the first part of the path (e.g. dub.sh/stats/github -> stats)
+  const key = decodeURIComponent(path.split("/")[1]); // key is the first part of the path (e.g. dub.co/stats/github -> stats)
   const fullKey = decodeURIComponent(path.slice(1)); // fullKey is the full path without the first slash (to account for multi-level subpaths, e.g. dub.sh/github/repo -> github/repo)
 
-  return { domain, path, key, fullKey };
+  return { domain, path, fullPath, key, fullKey };
 };
 
 export const getFinalUrl = (target: string, { req }: { req: NextRequest }) => {
-  // query is the query string (e.g. dub.sh/github/repo?utm_source=twitter -> ?utm_source=twitter)
+  // query is the query string (e.g. dub.sh/github?utm_source=twitter -> ?utm_source=twitter)
   const searchParams = req.nextUrl.searchParams;
 
   // get the query params of the target url
-  const targetUrl = new URL(target);
+  const targetUrl = new URL(decodeURIComponent(target));
+
+  // @ts-ignore – until https://github.com/microsoft/TypeScript/issues/54466 is fixed
+  if (searchParams.size === 0) return targetUrl; // if there are no query params, then return the target url as is (no need to parse it
 
   // if searchParams (type: `URLSearchParams`) has the same key as target url, then overwrite it
   for (const [key, value] of searchParams) {
@@ -50,5 +67,47 @@ export const detectBot = (req: NextRequest) => {
       ua,
     );
   }
+  return false;
+};
+
+// check if a link can be displayed in an iframe
+export const isIframeable = async ({
+  url,
+  requestDomain,
+}: {
+  url: string;
+  requestDomain: string;
+}) => {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "dub-bot/1.0",
+    },
+  });
+
+  // if the request throws a status that's not 200, then it's not iframeable
+  if (!res.ok) {
+    return false;
+  }
+
+  const xFrameOptions = res.headers.get("X-Frame-Options"); // returns null if there is no `X-Frame-Options` header
+  if (xFrameOptions) {
+    return false;
+  }
+
+  const cspHeader = res.headers.get("content-security-policy");
+  if (!cspHeader) {
+    return true;
+  }
+
+  const frameAncestorsMatch = cspHeader.match(
+    /frame-ancestors\s+([\s\S]+?)(?=;|$)/i,
+  );
+  if (frameAncestorsMatch) {
+    const allowedOrigins = frameAncestorsMatch[1].split(/\s+/);
+    if (allowedOrigins.includes(requestDomain)) {
+      return true;
+    }
+  }
+
   return false;
 };

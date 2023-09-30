@@ -12,6 +12,7 @@ import {
   Suspense,
   UIEvent,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
@@ -20,12 +21,13 @@ import { mutate } from "swr";
 import { useDebounce } from "use-debounce";
 import BlurImage from "#/ui/blur-image";
 import { AlertCircleFill, Lock, Random, X } from "@/components/shared/icons";
-import { LoadingCircle } from "#/ui/icons";
+import { LoadingCircle, Logo } from "#/ui/icons";
 import Modal from "#/ui/modal";
 import Tooltip, { TooltipContent } from "#/ui/tooltip";
-import useProject from "#/lib/hooks/use-project";
-import { LinkProps } from "#/lib/types";
+import useProject from "#/lib/swr-app/use-project";
+import { type Link as LinkProps } from "@prisma/client";
 import {
+  deepEqual,
   getApexDomain,
   getUrlWithoutUTMParams,
   linkConstructor,
@@ -39,25 +41,27 @@ import IOSSection from "./ios-section";
 import Preview from "./preview";
 import AndroidSection from "./android-section";
 import { DEFAULT_LINK_PROPS, GOOGLE_FAVICON_URL } from "#/lib/constants";
-import useDomains from "#/lib/hooks/use-domains";
+import useDomains from "#/lib/swr-app/use-domains";
 import { toast } from "sonner";
 import va from "@vercel/analytics";
 import punycode from "punycode/";
 import Button from "#/ui/button";
+import { ModalContext } from "#/ui/modal-provider";
+import RewriteSection from "./rewrite-section";
+import CommentsSection from "./comments-section";
+import GeoSection from "./geo-section";
 
 function AddEditLinkModal({
   showAddEditLinkModal,
   setShowAddEditLinkModal,
   props,
   duplicateProps,
-  hideXButton,
   homepageDemo,
 }: {
   showAddEditLinkModal: boolean;
   setShowAddEditLinkModal: Dispatch<SetStateAction<boolean>>;
   props?: LinkProps;
   duplicateProps?: LinkProps;
-  hideXButton?: boolean;
   homepageDemo?: boolean;
 }) {
   const { slug } = useParams() as { slug?: string };
@@ -176,16 +180,21 @@ function AddEditLinkModal({
   }, [debouncedUrl, password, showAddEditLinkModal, proxy]);
 
   const logo = useMemo(() => {
-    // if the link is password protected, or if it's a new link and there's no URL yet,
-    // return the default Dub logo
-    if (password || (!debouncedUrl && !props)) {
-      return "/_static/logo.png";
-      // otherwise, get the favicon of the URL
-    } else {
-      return `${GOOGLE_FAVICON_URL}${getApexDomain(
-        debouncedUrl || props?.url || "https://dub.sh",
-      )}`;
-    }
+    // if the link is password protected, or if it's a new link and there's no URL yet, return the default Dub logo
+    // otherwise, get the favicon of the URL
+    const url = password || !debouncedUrl ? null : debouncedUrl || props?.url;
+
+    return url ? (
+      <BlurImage
+        src={`${GOOGLE_FAVICON_URL}${getApexDomain(url)}`}
+        alt="Logo"
+        className="h-10 w-10 rounded-full"
+        width={20}
+        height={20}
+      />
+    ) : (
+      <Logo />
+    );
   }, [password, debouncedUrl, props]);
 
   const endpoint = useMemo(() => {
@@ -237,6 +246,9 @@ function AddEditLinkModal({
             !proxy
           ) {
             return true;
+          } else if (key === "geo") {
+            const equalGeo = deepEqual(props.geo as object, data.geo as object);
+            return equalGeo;
           }
           // Otherwise, check for discrepancy in the current key-value pair
           return data[key] === value;
@@ -256,10 +268,11 @@ function AddEditLinkModal({
     <Modal
       showModal={showAddEditLinkModal}
       setShowModal={setShowAddEditLinkModal}
-      closeWithX={homepageDemo ? false : true}
+      className="max-w-screen-lg"
+      preventDefaultClose={homepageDemo ? false : true}
     >
-      <div className="relative grid max-h-[80vh] w-full divide-x divide-gray-100 overflow-scroll bg-white shadow-xl transition-all scrollbar-hide md:max-h-[min(906px,_90vh)] md:max-w-screen-lg md:grid-cols-2 md:rounded-2xl md:border md:border-gray-200">
-        {!hideXButton && !homepageDemo && (
+      <div className="grid max-h-[80vh] divide-x divide-gray-100 overflow-scroll scrollbar-hide md:max-h-[min(906px,_90vh)] md:grid-cols-2">
+        {!homepageDemo && (
           <button
             onClick={() => setShowAddEditLinkModal(false)}
             className="group absolute right-0 top-0 z-20 m-3 hidden rounded-full p-2 text-gray-500 transition-all duration-75 hover:bg-gray-100 focus:outline-none active:bg-gray-200 md:block"
@@ -273,13 +286,7 @@ function AddEditLinkModal({
           onScroll={handleScroll}
         >
           <div className="z-10 flex flex-col items-center justify-center space-y-3 border-b border-gray-200 bg-white px-4 pb-8 pt-8 transition-all md:sticky md:top-0 md:px-16">
-            <BlurImage
-              src={logo}
-              alt="Logo"
-              className="h-10 w-10 rounded-full"
-              width={20}
-              height={20}
-            />
+            {logo}
             <h3 className="text-lg font-medium">
               {props
                 ? `Edit ${linkConstructor({
@@ -302,25 +309,26 @@ function AddEditLinkModal({
                 },
                 body: JSON.stringify(data),
               }).then(async (res) => {
-                setSaving(false);
                 if (res.status === 200) {
                   // track link creation event
                   endpoint.method === "POST" &&
                     va.track("Created Link", {
                       type: slug ? "Custom Domain" : "Default Domain",
                     });
-                  mutate(
-                    `/api/links${
-                      searchParams ? `?${searchParams.toString()}` : ""
-                    }`,
-                  );
-                  mutate(
-                    (key) =>
-                      typeof key === "string" &&
-                      key.startsWith(`/api/links/_count`),
-                    undefined,
-                    { revalidate: true },
-                  );
+                  await Promise.all([
+                    mutate(
+                      `/api/links${
+                        searchParams ? `?${searchParams.toString()}` : ""
+                      }`,
+                    ),
+                    mutate(
+                      (key) =>
+                        typeof key === "string" &&
+                        key.startsWith(`/api/links/_count`),
+                      undefined,
+                      { revalidate: true },
+                    ),
+                  ]);
                   // for welcome page, redirect to links page after adding a link
                   if (pathname === "/welcome") {
                     router.push("/links");
@@ -354,6 +362,7 @@ function AddEditLinkModal({
                     toast.error(res.statusText);
                   }
                 }
+                setSaving(false);
               });
             }}
             className="grid gap-6 bg-gray-50 pt-8"
@@ -379,6 +388,7 @@ function AddEditLinkModal({
                     id={`url-${randomIdx}`}
                     type="url"
                     required
+                    autoComplete="off"
                     placeholder="https://github.com/steven-tey/dub"
                     value={url}
                     onChange={(e) => {
@@ -389,7 +399,7 @@ function AddEditLinkModal({
                       urlError
                         ? "border-red-300 pr-10 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500"
                         : "border-gray-300 text-gray-900 placeholder-gray-300 focus:border-gray-500 focus:ring-gray-500"
-                    } block w-full rounded-md text-sm focus:outline-none`}
+                    } block w-full rounded-md focus:outline-none sm:text-sm`}
                     aria-invalid="true"
                   />
                   {urlError && (
@@ -469,9 +479,9 @@ function AddEditLinkModal({
                       pattern="[\p{Letter}\p{Mark}\d-]+" // Unicode regex to match characters from all languages and numbers (and omit all symbols except for dashes)
                       className={`${
                         keyError
-                          ? "border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500"
+                          ? "border-red-300 pr-10 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500"
                           : "border-gray-300 text-gray-900 placeholder-gray-300 focus:border-gray-500 focus:ring-gray-500"
-                      } block w-full rounded-r-md pr-10 text-sm focus:outline-none`}
+                      } block w-full rounded-r-md focus:outline-none sm:text-sm`}
                       placeholder="github"
                       value={key}
                       onChange={(e) => {
@@ -515,15 +525,18 @@ function AddEditLinkModal({
             </div>
 
             <div className="grid gap-5 px-4 md:px-16">
+              <CommentsSection {...{ props, data, setData }} />
               <OGSection
                 {...{ props, data, setData }}
                 generatingMetatags={generatingMetatags}
               />
               <UTMSection {...{ props, data, setData }} />
+              <RewriteSection {...{ data, setData }} />
               <PasswordSection {...{ props, data, setData }} />
               <ExpirationSection {...{ props, data, setData }} />
               <IOSSection {...{ props, data, setData }} />
               <AndroidSection {...{ props, data, setData }} />
+              <GeoSection {...{ props, data, setData }} />
             </div>
 
             <div
@@ -562,6 +575,7 @@ function AddEditLinkButton({
   const { slug } = useParams() as { slug?: string };
 
   const { exceededUsage } = useProject();
+  const { setShowUpgradePlanModal } = useContext(ModalContext);
 
   const onKeyDown = useCallback((e: KeyboardEvent) => {
     const target = e.target as HTMLElement;
@@ -594,7 +608,7 @@ function AddEditLinkButton({
         <TooltipContent
           title="Your project has exceeded its usage limit. We're still collecting data on your existing links, but you need to upgrade to add more links."
           cta="Upgrade to Pro"
-          href={`/${slug}/settings/billing`}
+          onClick={() => setShowUpgradePlanModal(true)}
         />
       }
     >
@@ -621,12 +635,10 @@ function AddEditLinkButton({
 export function useAddEditLinkModal({
   props,
   duplicateProps,
-  hideXButton,
   homepageDemo,
 }: {
   props?: LinkProps;
   duplicateProps?: LinkProps;
-  hideXButton?: boolean;
   homepageDemo?: boolean;
 } = {}) {
   const [showAddEditLinkModal, setShowAddEditLinkModal] = useState(false);
@@ -639,19 +651,11 @@ export function useAddEditLinkModal({
           setShowAddEditLinkModal={setShowAddEditLinkModal}
           props={props}
           duplicateProps={duplicateProps}
-          hideXButton={hideXButton}
           homepageDemo={homepageDemo}
         />
       </Suspense>
     );
-  }, [
-    showAddEditLinkModal,
-    setShowAddEditLinkModal,
-    props,
-    duplicateProps,
-    hideXButton,
-    homepageDemo,
-  ]);
+  }, [showAddEditLinkModal, setShowAddEditLinkModal]);
 
   const AddEditLinkButtonCallback = useCallback(() => {
     return (

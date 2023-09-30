@@ -8,11 +8,14 @@ import {
 } from "react";
 import { mutate } from "swr";
 import BlurImage from "#/ui/blur-image";
-import Modal from "@/components/shared/modal";
+import Modal from "#/ui/modal";
 import useProject from "#/lib/swr/use-project";
 import { toast } from "sonner";
 import Button from "#/ui/button";
 import { UserProps } from "#/lib/types";
+import { Logo } from "#/ui/icons";
+import { useSession } from "next-auth/react";
+import Avatar from "#/ui/avatar";
 
 function RemoveTeammateModal({
   showRemoveTeammateModal,
@@ -28,81 +31,121 @@ function RemoveTeammateModal({
   const router = useRouter();
   const { slug } = router.query as { slug: string };
   const [removing, setRemoving] = useState(false);
-  const { logo } = useProject();
+  const { name: projectName, logo } = useProject();
+  const { data: session } = useSession();
   const { id, name, email, image } = user;
+
+  const { title, description } = useMemo(() => {
+    if (invite) {
+      return {
+        title: "Remove Invitation",
+        description: `This will remove <strong>${
+          name || email
+        }</stromg>'s invitation to join your project.`,
+      };
+    } else if (session?.user?.email === email) {
+      return {
+        title: "Leave Project",
+        description: `You are about to leave ${projectName}. To regain access, the Project Owner will need to re-invite you.`,
+      };
+    } else {
+      return {
+        title: "Remove Teammate",
+        description: `This will remove ${name || email} from your project.`,
+      };
+    }
+  }, [invite, session, name, email]);
 
   return (
     <Modal
       showModal={showRemoveTeammateModal}
       setShowModal={setShowRemoveTeammateModal}
     >
-      <div className="inline-block w-full transform overflow-hidden bg-white align-middle shadow-xl transition-all sm:max-w-md sm:rounded-2xl sm:border sm:border-gray-200">
-        <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 px-4 py-4 pt-8 sm:px-16">
+      <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 px-4 py-4 pt-8 sm:px-16">
+        {logo ? (
           <BlurImage
-            src={logo || `/_static/logo.png`}
-            alt="Remove Teammate"
+            src={logo}
+            alt="Project logo"
             className="h-10 w-10 rounded-full"
             width={20}
             height={20}
           />
-          <h3 className="text-lg font-medium">Remove Teammate</h3>
-          <p className="text-center text-sm text-gray-500">
-            This will remove{" "}
-            <span className="font-semibold text-black">{name || email}</span>
-            {invite
-              ? "'s invitation to join your project."
-              : " from your project. Are you sure you want to continue?"}
-          </p>
-        </div>
+        ) : (
+          <Logo />
+        )}
+        <h3 className="text-lg font-medium">
+          {invite
+            ? "Revoke Invitation"
+            : session?.user?.email === email
+            ? "Leave Project"
+            : "Remove Teammate"}
+        </h3>
+        <p className="text-center text-sm text-gray-500">
+          {invite
+            ? "This will revoke "
+            : session?.user?.email === email
+            ? "You're about to leave "
+            : "This will remove "}
+          <span className="font-semibold text-black">
+            {session?.user?.email === email ? projectName : name || email}
+          </span>
+          {invite
+            ? "'s invitation to join your project. "
+            : session?.user?.email === email
+            ? ". You will lose all access to this project. "
+            : " from your project. "}
+          Are you sure you want to continue?
+        </p>
+      </div>
 
-        <div className="flex flex-col space-y-4 bg-gray-50 px-4 py-8 text-left sm:px-16">
-          <div className="flex items-center space-x-3 rounded-md border border-gray-300 bg-white p-3">
-            <BlurImage
-              src={
-                image || `https://avatars.dicebear.com/api/micah/${email}.svg`
-              }
-              alt={email}
-              width={40}
-              height={40}
-              className="overflow-hidden rounded-full border border-gray-200"
-            />
-            <div className="flex flex-col">
-              <h3 className="text-sm font-medium">{name || email}</h3>
-              <p className="text-xs text-gray-500">{email}</p>
-            </div>
+      <div className="flex flex-col space-y-4 bg-gray-50 px-4 py-8 text-left sm:px-16">
+        <div className="flex items-center space-x-3 rounded-md border border-gray-300 bg-white p-3">
+          <Avatar user={user} />
+          <div className="flex flex-col">
+            <h3 className="text-sm font-medium">{name || email}</h3>
+            <p className="text-xs text-gray-500">{email}</p>
           </div>
-          <Button
-            text="Confirm remove"
-            variant="danger"
-            loading={removing}
-            onClick={() => {
-              setRemoving(true);
-              fetch(
-                `/api/projects/${slug}/${
-                  invite ? `invites?email=${email}` : `users?userId=${id}`
-                }`,
-                {
-                  method: "DELETE",
-                  headers: { "Content-Type": "application/json" },
-                },
-              ).then(async (res) => {
-                setRemoving(false);
-                if (res.status === 200) {
-                  toast.success(
-                    `${invite ? "Invite" : "User"} removed from project!`,
-                  );
-                  mutate(
-                    `/api/projects/${slug}/${invite ? "invites" : "users"}`,
-                  );
-                  setShowRemoveTeammateModal(false);
-                } else {
-                  const error = await res.text();
-                  toast.error(error);
-                }
-              });
-            }}
-          />
         </div>
+        <Button
+          text="Confirm"
+          variant="danger"
+          loading={removing}
+          onClick={() => {
+            setRemoving(true);
+            fetch(
+              `/api/projects/${slug}/${
+                invite ? `invites?email=${email}` : `users?userId=${id}`
+              }`,
+              {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+              },
+            ).then(async (res) => {
+              if (res.status === 200) {
+                await mutate(
+                  `/api/projects/${slug}/${invite ? "invites" : "users"}`,
+                );
+                if (session?.user?.email === email) {
+                  await mutate("/api/projects");
+                  await router.push("/");
+                } else {
+                  setShowRemoveTeammateModal(false);
+                }
+                toast.success(
+                  session?.user?.email === email
+                    ? "You have left the project!"
+                    : invite
+                    ? "Successfully revoked invitation!"
+                    : "Successfully removed teammate!",
+                );
+              } else {
+                const error = await res.text();
+                toast.error(error);
+              }
+              setRemoving(false);
+            });
+          }}
+        />
       </div>
     </Modal>
   );

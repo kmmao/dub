@@ -1,16 +1,8 @@
+import { inviteUser } from "#/lib/api/users";
 import { withProjectAuth } from "#/lib/auth";
 import prisma from "#/lib/prisma";
-import sendMail from "emails";
-import ProjectInvite from "emails/ProjectInvite";
-import { randomBytes, createHash } from "crypto";
 
-const hashToken = (token: string) => {
-  return createHash("sha256")
-    .update(`${token}${process.env.NEXTAUTH_SECRET}`)
-    .digest("hex");
-};
-
-export default withProjectAuth(async (req, res, project) => {
+export default withProjectAuth(async (req, res, project, session) => {
   // GET /api/projects/[slug]/invites - Get all pending invites for a project
   if (req.method === "GET") {
     const invites = await prisma.projectInvite.findMany({
@@ -22,12 +14,7 @@ export default withProjectAuth(async (req, res, project) => {
         createdAt: true,
       },
     });
-    return res.status(200).json(
-      invites.map((invite) => ({
-        email: invite.email,
-        joinedAt: invite.createdAt,
-      })),
-    );
+    return res.status(200).json(invites);
 
     // POST /api/projects/[slug]/invites – invite a teammate
   } else if (req.method === "POST") {
@@ -63,48 +50,15 @@ export default withProjectAuth(async (req, res, project) => {
       }
     }
 
-    // same method of generating a token as next-auth
-    const token = randomBytes(32).toString("hex");
-    const TWO_WEEKS_IN_SECONDS = 60 * 60 * 24 * 14;
-    const expires = new Date(Date.now() + TWO_WEEKS_IN_SECONDS * 1000);
-
-    // create a project invite record and a verification request token that lasts for a week
-    // here we use a try catch to account for the case where the user has already been invited
-    // for which `prisma.projectInvite.create()` will throw a unique constraint error
     try {
-      await prisma.projectInvite.create({
-        data: {
-          email,
-          expires,
-          projectId: project.id,
-        },
-      });
-
-      await prisma.verificationToken.create({
-        data: {
-          identifier: email,
-          token: hashToken(token),
-          expires,
-        },
-      });
-
-      const params = new URLSearchParams({
-        callbackUrl: `${process.env.NEXTAUTH_URL}/${project.slug}`,
+      await inviteUser({
         email,
-        token,
+        project,
+        session,
       });
-
-      const url = `${process.env.NEXTAUTH_URL}/api/auth/callback/email?${params}`;
-
-      sendMail({
-        subject: "You've been invited to join a project on Dub",
-        to: email,
-        component: <ProjectInvite url={url} projectName={project.name} />,
-      });
-
       return res.status(200).json({ message: "Invite sent" });
     } catch (error) {
-      return res.status(400).end("User already invited.");
+      return res.status(400).end(error.message);
     }
 
     // DELETE /api/projects/[slug]/invites – delete a pending invite

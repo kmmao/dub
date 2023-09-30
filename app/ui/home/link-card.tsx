@@ -7,7 +7,8 @@ import { useAddEditLinkModal } from "#/ui/modals/add-edit-link-modal";
 import { useLinkQRModal } from "#/ui/modals/link-qr-modal";
 import BlurImage from "#/ui/blur-image";
 import CopyButton from "@/components/shared/copy-button";
-import { Chart, QR, ThreeDots } from "@/components/shared/icons";
+import { QrCode } from "lucide-react";
+import { Chart, ThreeDots } from "@/components/shared/icons";
 import { LoadingDots } from "#/ui/icons";
 import {
   DEFAULT_LINK_PROPS,
@@ -21,6 +22,7 @@ import {
   linkConstructor,
   nFormatter,
 } from "#/lib/utils";
+import Number from "#/ui/number";
 
 export default function LinkCard({
   _key: key,
@@ -152,7 +154,7 @@ export default function LinkCard({
             height={20}
           />
           <div>
-            <div className="mb-1 flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               <a
                 className="font-semibold text-blue-800"
                 href={linkConstructor({ key })}
@@ -164,33 +166,42 @@ export default function LinkCard({
               <CopyButton url={linkConstructor({ key })} />
               <button
                 onClick={() => setShowLinkQRModal(true)}
-                className="group rounded-full bg-gray-100 p-1.5 transition-all duration-75 hover:scale-105 hover:bg-blue-100 active:scale-95"
+                className="group rounded-full bg-gray-100 p-1.5 transition-all duration-75 hover:scale-105 hover:bg-blue-100 focus:outline-none active:scale-95"
               >
                 <span className="sr-only">Copy</span>
-                <QR className="text-gray-700 transition-all group-hover:text-blue-800" />
+                <QrCode className="h-4 w-4 text-gray-700 transition-all group-hover:text-blue-800" />
               </button>
-              <Link
-                href={`/stats/${encodeURI(key)}`}
-                className="flex items-center space-x-1 rounded-md bg-gray-100 px-2 py-0.5 text-gray-700 transition-all duration-75 hover:scale-105 active:scale-95"
-              >
-                <Chart className="h-4 w-4" />
-                <p className="text-sm">
-                  {!clicks && clicks !== 0 ? (
-                    <LoadingDots color="#71717A" />
-                  ) : (
-                    nFormatter(clicks)
-                  )}
-                  <span className="ml-1 hidden sm:inline-block">clicks</span>
-                </p>
-              </Link>
+              <Number value={clicks}>
+                <Link
+                  href={`/stats/${encodeURI(key)}`}
+                  className="flex items-center space-x-1 rounded-md bg-gray-100 px-2 py-0.5 text-gray-700 transition-all duration-75 hover:scale-105 active:scale-95"
+                >
+                  <Chart className="h-4 w-4" />
+                  <p className="text-sm">
+                    {!clicks && clicks !== 0 ? (
+                      <LoadingDots color="#71717A" />
+                    ) : (
+                      nFormatter(clicks)
+                    )}
+                    <span className="ml-1 hidden sm:inline-block">clicks</span>
+                  </p>
+                </Link>
+              </Number>
             </div>
-            <p className="w-72 truncate text-sm text-gray-500">{url}</p>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="line-clamp-1 w-72 text-sm text-gray-500 underline-offset-2 transition-all hover:text-gray-800 hover:underline"
+            >
+              {url}
+            </a>
           </div>
         </div>
         <button
           type="button"
           onClick={() => setShowAddEditLinkModal(true)}
-          className="rounded-md px-1 py-2 transition-all duration-75 hover:bg-gray-100 active:bg-gray-200"
+          className="rounded-md px-1 py-2 transition-all duration-75 hover:bg-gray-100 focus:outline-none active:bg-gray-200"
         >
           <span className="sr-only">Edit</span>
           <ThreeDots className="h-5 w-5 text-gray-500" />

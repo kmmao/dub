@@ -115,7 +115,7 @@ export default function DomainConfiguration({
           <div>
             <p className="text-sm font-bold">Value</p>
             <p className="mt-2 font-mono text-sm">
-              {recordType === "A" ? `76.76.21.21` : `cname.dub.sh`}
+              {recordType === "A" ? `76.76.21.21` : `cname.dub.co`}
             </p>
           </div>
           <div>
@@ -126,7 +126,7 @@ export default function DomainConfiguration({
         <p className="mt-5 text-sm">
           Note: for TTL, if <InlineSnippet>86400</InlineSnippet> is not
           available, set the highest value possible. Also, domain propagation
-          can take up to an hour.
+          can take anywhere between 1 hour to 12 hours.
         </p>
       </div>
     </div>

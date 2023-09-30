@@ -7,7 +7,8 @@ import {
   validateDomain,
 } from "#/lib/api/domains";
 import prisma from "#/lib/prisma";
-import { isReservedKey, validSlugRegex } from "#/lib/utils";
+import { isReservedKey } from "#/lib/edge-config";
+import { validSlugRegex } from "#/lib/utils";
 
 export default withUserAuth(
   async (req: NextApiRequest, res: NextApiResponse, session: Session) => {
@@ -54,7 +55,7 @@ export default withUserAuth(
       if (slugError || validDomain !== true) {
         return res.status(422).json({
           slugError,
-          domainError: validDomain ? null : "Invalid domain",
+          domainError: validDomain === true ? null : validDomain,
         });
       }
       const [slugExist, domainExist] = await Promise.all([

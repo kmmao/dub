@@ -8,9 +8,8 @@ import {
   useState,
 } from "react";
 import { mutate } from "swr";
-import BlurImage from "#/ui/blur-image";
-import { LoadingDots } from "#/ui/icons";
-import Modal from "@/components/shared/modal";
+import { Logo, LoadingDots } from "#/ui/icons";
+import Modal from "#/ui/modal";
 import useProject from "#/lib/swr/use-project";
 import { toast } from "sonner";
 import va from "@vercel/analytics";
@@ -31,17 +30,12 @@ function AcceptInviteModal({
     <Modal
       showModal={showAcceptInviteModal}
       setShowModal={setShowAcceptInviteModal}
+      preventDefaultClose
     >
       {error?.status === 409 ? (
-        <div className="inline-block w-full transform overflow-hidden bg-white align-middle shadow-xl transition-all sm:max-w-md sm:rounded-2xl sm:border sm:border-gray-200">
+        <>
           <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 px-4 py-4 pt-8 sm:px-16">
-            <BlurImage
-              src={`/_static/logo.png`}
-              alt={"Invite Teammate"}
-              className="h-10 w-10 rounded-full"
-              width={20}
-              height={20}
-            />
+            <Logo />
             <h3 className="text-lg font-medium">Project Invitation</h3>
             <p className="text-center text-sm text-gray-500">
               You've been invited to join and collaborate on the{" "}
@@ -58,18 +52,18 @@ function AcceptInviteModal({
                 fetch(`/api/projects/${slug}/invites/accept`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                }).then(() => {
-                  toast.success("You now are a part of this project!");
+                }).then(async () => {
                   va.track("User accepted project invite", {
                     project: slug,
                   });
-                  mutate(
+                  await mutate(
                     (key) =>
                       typeof key === "string" &&
                       key.startsWith(`/api/projects`),
                     undefined,
                     { revalidate: true },
                   );
+                  toast.success("You now are a part of this project!");
                 });
               }}
               disabled={accepting}
@@ -86,17 +80,11 @@ function AcceptInviteModal({
               )}
             </button>
           </div>
-        </div>
+        </>
       ) : (
-        <div className="inline-block w-full transform overflow-hidden bg-white align-middle shadow-xl transition-all sm:max-w-md sm:rounded-2xl sm:border sm:border-gray-200">
+        <>
           <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 px-4 py-4 pt-8 sm:px-16">
-            <BlurImage
-              src={`/_static/logo.png`}
-              alt={"Invite Teammate"}
-              className="h-10 w-10 rounded-full"
-              width={20}
-              height={20}
-            />
+            <Logo />
             <h3 className="text-lg font-medium">Project Invitation Expired</h3>
             <p className="text-center text-sm text-gray-500">
               This invite has expired or is no longer valid.
@@ -110,7 +98,7 @@ function AcceptInviteModal({
               Back to dashboard
             </Link>
           </div>
-        </div>
+        </>
       )}
     </Modal>
   );

@@ -1,18 +1,21 @@
 import { useRouter } from "next/router";
-import { useContext, useMemo, useState } from "react";
+import { useCallback, useContext, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import BlurImage from "#/ui/blur-image";
-import { ChevronUpDown, PlusCircle, Tick } from "@/components/shared/icons";
-import Popover from "@/components/shared/popover";
+import { Tick } from "@/components/shared/icons";
+import { ChevronsUpDown, PlusCircle } from "lucide-react";
+import Popover from "#/ui/popover";
 import { PlanProps, ProjectWithDomainProps } from "#/lib/types";
 import useProjects from "#/lib/swr/use-projects";
-import PlanBadge from "@/components/app/projects/settings/plan-badge";
+import PlanBadge from "@/components/app/projects/plan-badge";
 import { GOOGLE_FAVICON_URL } from "#/lib/constants";
 import { ModalContext } from "#/ui/modal-provider";
 import Link from "next/link";
+import useProject from "#/lib/swr/use-project";
+import Avatar from "#/ui/avatar";
 
 export default function ProjectSelect() {
   const { projects } = useProjects();
+  const { error, loading } = useProject();
 
   const router = useRouter();
   const { slug, key } = router.query as {
@@ -23,7 +26,7 @@ export default function ProjectSelect() {
   const { data: session } = useSession();
 
   const selected = useMemo(() => {
-    if (slug && projects) {
+    if (slug && projects && !error) {
       const selectedProject = projects?.find(
         (project) => project.slug === slug,
       );
@@ -33,6 +36,8 @@ export default function ProjectSelect() {
           selectedProject?.logo ||
           `${GOOGLE_FAVICON_URL}${selectedProject?.primaryDomain?.slug}`,
       };
+
+      // return personal account selector if there's no project or error (user doesn't have access to project)
     } else {
       return {
         name: session?.user?.name || session?.user?.email,
@@ -43,7 +48,7 @@ export default function ProjectSelect() {
         plan: "free",
       };
     }
-  }, [slug, projects, session]) as {
+  }, [slug, projects, session, error]) as {
     id?: string;
     name: string;
     slug: string;
@@ -53,46 +58,54 @@ export default function ProjectSelect() {
 
   const [openPopover, setOpenPopover] = useState(false);
 
-  if (!projects || !router.isReady)
+  if (!router.isReady || !projects || loading) {
     return (
-      <div className="flex animate-pulse items-center justify-end space-x-1.5 rounded-lg px-1.5 py-2 sm:w-60">
+      <div className="flex animate-pulse items-center space-x-1.5 rounded-lg px-1.5 py-2 sm:w-60">
         <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
         <div className="hidden h-8 w-28 animate-pulse rounded-md bg-gray-200 sm:block sm:w-40" />
-        <ChevronUpDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+        <ChevronsUpDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
       </div>
     );
+  }
 
   return (
     <div>
       <Popover
-        content={<ProjectList selected={selected} projects={projects} />}
+        content={
+          <ProjectList
+            selected={selected}
+            projects={projects}
+            setOpenPopover={setOpenPopover}
+          />
+        }
         openPopover={openPopover}
         setOpenPopover={setOpenPopover}
       >
         <button
           onClick={() => setOpenPopover(!openPopover)}
-          className="flex items-center justify-between rounded-lg bg-white p-1.5 text-left text-sm transition-all duration-75 hover:bg-gray-100 focus:outline-none active:bg-gray-200 sm:w-60"
+          className="flex items-center justify-between rounded-lg bg-white p-1.5 text-left text-sm transition-all duration-75 hover:bg-gray-100 focus:outline-none active:bg-gray-200"
         >
           <div className="flex items-center space-x-3 pr-2">
-            <BlurImage
+            <img
               src={selected.image}
               alt={selected.id || selected.name}
               className="h-8 w-8 flex-none overflow-hidden rounded-full"
-              width={48}
-              height={48}
             />
             <div
               className={`${
                 key ? "hidden" : "flex"
-              } w-28 items-center space-x-3 sm:flex sm:w-40`}
+              } items-center space-x-3 sm:flex`}
             >
-              <span className="truncate whitespace-nowrap text-sm font-medium">
+              <span className="inline-block max-w-[100px] truncate text-sm font-medium sm:max-w-[200px]">
                 {selected.name}
               </span>
               {selected.slug !== "/" && <PlanBadge plan={selected.plan} />}
             </div>
           </div>
-          <ChevronUpDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+          <ChevronsUpDown
+            className="h-4 w-4 text-gray-400"
+            aria-hidden="true"
+          />
         </button>
       </Popover>
     </div>
@@ -102,6 +115,7 @@ export default function ProjectSelect() {
 function ProjectList({
   selected,
   projects,
+  setOpenPopover,
 }: {
   selected: {
     name: string;
@@ -110,9 +124,24 @@ function ProjectList({
     plan: PlanProps;
   };
   projects: ProjectWithDomainProps[];
+  setOpenPopover: (open: boolean) => void;
 }) {
   const { data: session } = useSession();
   const { setShowAddProjectModal } = useContext(ModalContext);
+  const router = useRouter();
+  const { domain, key } = router.query as { domain?: string; key?: string };
+  const href = useCallback(
+    (slug: string) => {
+      if (domain || key || selected.slug === "/") {
+        // if we're on a link page, navigate back to the project root
+        return `/${slug}`;
+      } else {
+        // else, we keep the path but remove all query params
+        return router.asPath.replace(selected.slug, slug).split("?")[0];
+      }
+    },
+    [domain, key, router, selected.slug],
+  );
 
   return (
     <div className="relative mt-1 max-h-72 w-full space-y-0.5 overflow-auto rounded-md bg-white p-2 text-base sm:w-60 sm:text-sm sm:shadow-lg">
@@ -123,19 +152,9 @@ function ProjectList({
           selected.slug === "/" ? "font-medium" : ""
         } transition-all duration-75`}
         href="/links"
+        onClick={() => setOpenPopover(false)}
       >
-        <BlurImage
-          src={
-            session?.user?.image ||
-            `https://avatars.dicebear.com/api/micah/${session?.user?.email}.svg`
-          }
-          alt={
-            session?.user?.name || session?.user?.email || "Personal Account"
-          }
-          className="h-7 w-7 flex-none overflow-hidden rounded-full"
-          width={48}
-          height={48}
-        />
+        <Avatar user={session?.user} className="h-7 w-7" />
         <span
           className={`block truncate pr-8 text-sm ${
             selected.slug === "/" ? "font-medium" : "font-normal"
@@ -156,14 +175,14 @@ function ProjectList({
           className={`relative flex w-full items-center space-x-2 rounded-md px-2 py-1.5 hover:bg-gray-100 active:bg-gray-200 ${
             selected.slug === slug ? "font-medium" : ""
           } transition-all duration-75`}
-          href={`/${slug}`}
+          href={href(slug)}
+          shallow={false}
+          onClick={() => setOpenPopover(false)}
         >
-          <BlurImage
+          <img
             src={logo || `${GOOGLE_FAVICON_URL}${primaryDomain?.slug}`}
             alt={id}
             className="h-7 w-7 overflow-hidden rounded-full"
-            width={48}
-            height={48}
           />
           <span
             className={`block truncate text-sm ${
@@ -181,10 +200,13 @@ function ProjectList({
       ))}
       <button
         key="add"
-        onClick={() => setShowAddProjectModal(true)}
+        onClick={() => {
+          setOpenPopover(false);
+          setShowAddProjectModal(true);
+        }}
         className="flex w-full cursor-pointer items-center space-x-2 rounded-md p-2 transition-all duration-75 hover:bg-gray-100"
       >
-        <PlusCircle className="h-7 w-7 text-gray-600" />
+        <PlusCircle className="h-6 w-6 text-gray-500" />
         <span className="block truncate">Add a new project</span>
       </button>
     </div>

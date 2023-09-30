@@ -1,9 +1,9 @@
 "use client";
 /* 
   This Stats component lives in 3 different places:
-  1. Project link page, e.g. app.dub.sh/dub/dub.sh/github
-  2. Generic Dub.sh link page, e.g. app.dub.sh/links/steven
-  3. Public stats page, e.g. dub.sh/stats/github, stey.me/stats/weathergpt
+  1. Project link page, e.g. app.dub.co/dub/dub.sh/github
+  2. Generic Dub.co link page, e.g. app.dub.co/links/steven
+  3. Public stats page, e.g. dub.co/stats/github, stey.me/stats/weathergpt
 
   We use the `useEndpoint()` hook to get the correct layout
 */
@@ -15,13 +15,14 @@ import {
   useRouter,
   useSearchParams,
 } from "next/navigation";
+import { X } from "lucide-react";
+import Toggle from "./toggle";
 import Clicks from "./clicks";
 import Devices from "./devices";
-import Feedback from "./feedback";
 import Locations from "./locations";
 import Referer from "./referer";
-import Toggle from "./toggle";
-import { X } from "lucide-react";
+// using the regular feedback component until Server Actions play nice with ISR
+import Feedback from "@/components/stats/feedback";
 
 export const StatsContext = createContext<{
   basePath: string;
@@ -55,6 +56,8 @@ export default function Stats({
   const pathname = usePathname();
   const router = useRouter();
 
+  // Note: interestingly, useParams() returns `key` as encoded, unlike useRouter().query
+  // so we don't need to do encodeURIComponent() here
   let {
     slug,
     domain: domainSlug,
@@ -78,28 +81,28 @@ export default function Stats({
       : "";
 
   const { basePath, domain, endpoint } = useMemo(() => {
-    // Project link page, e.g. app.dub.sh/dub/dub.sh/github
+    // Project link page, e.g. app.dub.co/dub/dub.sh/github
     if (slug && domainSlug && key) {
       return {
-        basePath: `/${slug}/${domainSlug}/${encodeURIComponent(key)}`,
+        basePath: `/${slug}/${domainSlug}/${key}`,
         domain: domainSlug,
-        endpoint: `/api/links/${encodeURIComponent(key)}/stats`,
+        endpoint: `/api/links/${key}/stats`,
       };
 
-      // Generic Dub.sh link page, e.g. app.dub.sh/links/steven
+      // Generic Dub.co link page, e.g. app.dub.co/links/steven
     } else if (key && pathname?.startsWith("/links")) {
       return {
-        basePath: `/links/${encodeURIComponent(key)}`,
+        basePath: `/links/${key}`,
         domain: "dub.sh",
-        endpoint: `/api/links/${encodeURIComponent(key)}/stats`,
+        endpoint: `/api/links/${key}/stats`,
       };
     }
 
-    // Public stats page, e.g. dub.sh/stats/github, stey.me/stats/weathergpt
+    // Public stats page, e.g. dub.co/stats/github, stey.me/stats/weathergpt
     return {
-      basePath: `/stats/${encodeURIComponent(key)}`,
+      basePath: `/stats/${key}`,
       domain: staticDomain,
-      endpoint: `/api/edge/links/${encodeURIComponent(key)}/stats`,
+      endpoint: `/api/edge/links/${key}/stats`,
     };
   }, [slug, key, pathname]);
 
@@ -111,7 +114,7 @@ export default function Stats({
         endpoint, // endpoint for the API (e.g. /api/edge/links/[key]/stats)
         queryString, // query string for the API (e.g. ?interval=24h&domain=dub.sh, ?interval=24h, etc.)
         interval, // time interval (e.g. 24h, 7d, 30d, etc.)
-        key, // link key (e.g. github, weathergpt, etc.)
+        key: decodeURIComponent(key), // link key (e.g. github, weathergpt, etc.)
         modal, // whether or not this is a modal
       }}
     >

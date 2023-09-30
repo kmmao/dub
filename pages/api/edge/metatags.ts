@@ -12,7 +12,7 @@ export const config = {
 
 export default async function handler(req: NextRequest, ev: NextFetchEvent) {
   if (req.method === "GET") {
-    let url = req.nextUrl.searchParams.get("url");
+    const url = req.nextUrl.searchParams.get("url");
     if (!url || !isValidUrl(url)) {
       return new Response("Invalid URL", { status: 400 });
     }
@@ -35,6 +35,15 @@ export default async function handler(req: NextRequest, ev: NextFetchEvent) {
       status: 200,
       headers: {
         "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } else if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
       },
     });
   } else {
@@ -99,7 +108,7 @@ const getRelativeUrl = (url: string, imageUrl: string) => {
   return new URL(imageUrl, baseURL).toString();
 };
 
-export const getMetaTags = async (url: string, ev: NextFetchEvent) => {
+export const getMetaTags = async (url: string, ev?: NextFetchEvent) => {
   const html = await getHtml(url);
   if (!html) {
     return {
@@ -138,7 +147,7 @@ export const getMetaTags = async (url: string, ev: NextFetchEvent) => {
     object["icon"] ||
     object["shortcut icon"];
 
-  ev.waitUntil(
+  ev?.waitUntil(
     recordMetatags(url, title && description && image ? false : true),
   );
 

@@ -1,34 +1,9 @@
+import { DirectorySyncProviders } from "@boxyhq/saml-jackson";
 export interface SimpleLinkProps {
   domain?: string;
   key: string;
   url: string;
 }
-
-export interface LinkProps {
-  id?: string;
-  domain: string;
-  key: string;
-  url: string;
-  archived: boolean;
-  expiresAt: Date | null;
-  password: string | null;
-
-  proxy: boolean;
-  title: string | null;
-  description: string | null;
-  image: string | null;
-
-  ios: string | null;
-  android: string | null;
-
-  clicks: number;
-  userId?: string | null;
-  tagId?: string | null;
-
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
 export interface TagProps {
   id: string;
   name: string;
@@ -62,7 +37,7 @@ export interface ProjectProps {
     slug: string;
   }[];
   users?: {
-    role: string;
+    role: "owner" | "member";
   }[];
 }
 
@@ -77,8 +52,7 @@ export interface UserProps {
   email: string;
   image?: string;
   createdAt: Date;
-
-  joinedAt?: Date;
+  role: "owner" | "member";
   projects?: { projectId: string }[];
 }
 
@@ -89,15 +63,34 @@ export type DomainVerificationStatusProps =
   | "Domain Not Found"
   | "Unknown Error";
 
-export interface RootDomainProps {
-  target: string;
-  rewrite?: boolean;
-}
-
 export interface DomainProps {
   slug: string;
   verified: boolean;
   primary: boolean;
   target?: string;
   type: "redirect" | "rewrite";
+}
+
+export interface BitlyGroupProps {
+  guid: string;
+  bsds: string[]; // custom domains
+  tags: string[];
+}
+
+export interface ShortioDomainProps {
+  id: number;
+  domain: string;
+  links: number;
+}
+
+export interface SAMLProviderProps {
+  name: string;
+  logo: string;
+  saml: "okta" | "azure" | "google";
+  samlModalCopy: string;
+  scim: keyof typeof DirectorySyncProviders;
+  scimModalCopy: {
+    url: string;
+    token: string;
+  };
 }

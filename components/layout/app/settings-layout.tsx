@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import AppLayout from "components/layout/app";
+import dynamic from "next/dynamic";
+const AppLayout = dynamic(() => import("@/components/layout/app"), {
+  ssr: false,
+});
 import MaxWidthWrapper from "@/components/shared/max-width-wrapper";
 import { ReactNode } from "react";
-import clsx from "clsx";
+import { cn } from "#/lib/utils";
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -26,6 +29,10 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             name: "People",
             href: `/${slug}/settings/people`,
           },
+          {
+            name: "Security",
+            href: `/${slug}/settings/security`,
+          },
         ]
       : []),
   ];
@@ -40,12 +47,12 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
         </MaxWidthWrapper>
       </div>
       <MaxWidthWrapper className="grid items-start gap-5 py-10 md:grid-cols-5">
-        <div className="flex gap-1 md:grid">
+        <div className="sticky top-36 flex gap-1 md:grid">
           {tabs.map(({ name, href }) => (
             <Link
               href={href}
               key={href}
-              className={clsx(
+              className={cn(
                 "rounded-md p-2.5 text-sm transition-all duration-75 hover:bg-gray-100 active:bg-gray-200",
                 {
                   "font-semibold text-black": router.asPath === href,

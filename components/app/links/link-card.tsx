@@ -1,37 +1,66 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { useAddEditLinkModal } from "@/components/app/modals/add-edit-link-modal";
-import { useTagLinkModal } from "@/components/app/modals/tag-link-modal";
 import { useArchiveLinkModal } from "@/components/app/modals/archive-link-modal";
 import { useDeleteLinkModal } from "@/components/app/modals/delete-link-modal";
 import { useLinkQRModal } from "@/components/app/modals/link-qr-modal";
 import IconMenu from "@/components/shared/icon-menu";
 import BlurImage from "#/ui/blur-image";
 import CopyButton from "@/components/shared/copy-button";
-import { Chart, Delete, QR, ThreeDots } from "@/components/shared/icons";
-import Popover from "@/components/shared/popover";
-import Tooltip, { TooltipContent } from "#/ui/tooltip";
+import { Chart, Delete, ThreeDots } from "@/components/shared/icons";
+import Popover from "#/ui/popover";
+import Tooltip, { SimpleTooltipContent, TooltipContent } from "#/ui/tooltip";
 import useProject from "#/lib/swr/use-project";
-import { LinkProps } from "#/lib/types";
+import { type Link as LinkProps } from "@prisma/client";
 import {
+  cn,
   fetcher,
   getApexDomain,
   linkConstructor,
   nFormatter,
+  setQueryString,
   timeAgo,
 } from "#/lib/utils";
 import useIntersectionObserver from "#/lib/hooks/use-intersection-observer";
 import useDomains from "#/lib/swr/use-domains";
-import { Archive, CopyPlus, Edit3, Tag } from "lucide-react";
+import {
+  Archive,
+  CopyPlus,
+  Edit3,
+  EyeOff,
+  MessageCircle,
+  QrCode,
+} from "lucide-react";
 import punycode from "punycode/";
-import { GOOGLE_FAVICON_URL } from "#/lib/constants";
+import { GOOGLE_FAVICON_URL, HOME_DOMAIN } from "#/lib/constants";
 import useTags from "#/lib/swr/use-tags";
 import TagBadge from "@/components/app/links/tag-badge";
+import { ModalContext } from "#/ui/modal-provider";
+import Number from "#/ui/number";
+import Avatar from "#/ui/avatar";
+import { UserProps } from "#/lib/types";
 
-export default function LinkCard({ props }: { props: LinkProps }) {
-  const { key, domain, url, createdAt, archived, tagId } = props;
+export default function LinkCard({
+  props,
+}: {
+  props: LinkProps & {
+    user: UserProps;
+  };
+}) {
+  const {
+    key,
+    domain,
+    url,
+    rewrite,
+    createdAt,
+    lastClicked,
+    archived,
+    tagId,
+    comments,
+    user,
+  } = props;
   const { tags } = useTags();
   const tag = useMemo(() => tags?.find((t) => t.id === tagId), [tags, tagId]);
 
@@ -64,6 +93,7 @@ export default function LinkCard({ props }: { props: LinkProps }) {
   const { setShowAddEditLinkModal, AddEditLinkModal } = useAddEditLinkModal({
     props,
   });
+  const { setShowUpgradePlanModal } = useContext(ModalContext);
 
   // Duplicate link Modal
   const {
@@ -77,6 +107,7 @@ export default function LinkCard({ props }: { props: LinkProps }) {
     setShowAddEditLinkModal: setShowDuplicateLinkModal,
     AddEditLinkModal: DuplicateLinkModal,
   } = useAddEditLinkModal({
+    // @ts-expect-error
     duplicateProps: {
       ...propsToDuplicate,
       key: `${key}-copy`,
@@ -84,9 +115,6 @@ export default function LinkCard({ props }: { props: LinkProps }) {
     },
   });
 
-  const { setShowTagLinkModal, TagLinkModal } = useTagLinkModal({
-    props,
-  });
   const { setShowArchiveLinkModal, ArchiveLinkModal } = useArchiveLinkModal({
     props,
     archived: !archived,
@@ -103,7 +131,7 @@ export default function LinkCard({ props }: { props: LinkProps }) {
     if (existingModalBackdrop && selected) {
       setSelected(false);
     }
-  });
+  }, [selected]);
 
   const handlClickOnLinkCard = (e: any) => {
     // if clicked on linkRef, setSelected to true
@@ -123,7 +151,6 @@ export default function LinkCard({ props }: { props: LinkProps }) {
     };
   }, [handlClickOnLinkCard]);
 
-  const shortcuts = slug ? ["e", "d", "t", "a", "x"] : ["e", "d", "a", "x"];
   const onKeyDown = (e: any) => {
     // only run shortcut logic if:
     // - usage is not exceeded
@@ -133,9 +160,10 @@ export default function LinkCard({ props }: { props: LinkProps }) {
     if (
       !exceededUsage &&
       (selected || openPopover) &&
-      shortcuts.includes(e.key)
+      ["e", "d", "q", "a", "x"].includes(e.key)
     ) {
       setSelected(false);
+      e.preventDefault();
       switch (e.key) {
         case "e":
           setShowAddEditLinkModal(true);
@@ -143,8 +171,8 @@ export default function LinkCard({ props }: { props: LinkProps }) {
         case "d":
           setShowDuplicateLinkModal(true);
           break;
-        case "t":
-          setShowTagLinkModal(true);
+        case "q":
+          setShowLinkQRModal(true);
           break;
         case "a":
           setShowArchiveLinkModal(true);
@@ -170,12 +198,15 @@ export default function LinkCard({ props }: { props: LinkProps }) {
         selected ? "border-black" : "border-gray-50"
       } relative rounded-lg border-2 bg-white p-3 pr-1 shadow transition-all hover:shadow-md sm:p-4`}
     >
-      <LinkQRModal />
-      <AddEditLinkModal />
-      <DuplicateLinkModal />
-      {slug && <TagLinkModal />}
-      <ArchiveLinkModal />
-      <DeleteLinkModal />
+      {isVisible && (
+        <>
+          <LinkQRModal />
+          <AddEditLinkModal />
+          <DuplicateLinkModal />
+          <ArchiveLinkModal />
+          <DeleteLinkModal />
+        </>
+      )}
       <li className="relative flex items-center justify-between">
         <div className="relative flex shrink items-center">
           {archived ? (
@@ -221,11 +252,14 @@ export default function LinkCard({ props }: { props: LinkProps }) {
               ) : (
                 <a
                   onClick={(e) => {
-                    e.stopPropagation();
+                    e.stopPropagation(); // to avoid selecting the link card
                   }}
-                  className={`w-24 truncate text-sm font-semibold ${
-                    archived ? "text-gray-500" : "text-blue-800"
-                  } sm:w-full sm:text-base`}
+                  className={cn(
+                    "w-full max-w-[140px] truncate text-sm font-semibold text-blue-800 sm:max-w-[300px] sm:text-base md:max-w-[360px] xl:max-w-[500px]",
+                    {
+                      "text-gray-500": archived,
+                    },
+                  )}
                   href={linkConstructor({ key, domain })}
                   target="_blank"
                   rel="noreferrer"
@@ -238,63 +272,129 @@ export default function LinkCard({ props }: { props: LinkProps }) {
                 </a>
               )}
               <CopyButton url={linkConstructor({ key, domain })} />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowLinkQRModal(true);
-                }}
-                className="group rounded-full bg-gray-100 p-1.5 transition-all duration-75 hover:scale-105 hover:bg-blue-100 active:scale-95"
-              >
-                <span className="sr-only">Download QR</span>
-                <QR className="text-gray-700 transition-all group-hover:text-blue-800" />
-              </button>
-              <Link
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-                href={`/${
-                  slug ? `${slug}/${domain}` : "links"
-                }/${encodeURIComponent(key)}`}
-                className="flex items-center space-x-1 rounded-md bg-gray-100 px-2 py-0.5 transition-all duration-75 hover:scale-105 active:scale-100"
-              >
-                <Chart className="h-4 w-4" />
-                <p className="whitespace-nowrap text-sm text-gray-500">
-                  {nFormatter(clicks)}
-                  <span className="ml-1 hidden sm:inline-block">clicks</span>
-                </p>
-              </Link>
+              {comments && (
+                <Tooltip
+                  content={
+                    <div className="block max-w-sm px-4 py-2 text-center text-sm text-gray-700">
+                      {comments}
+                    </div>
+                  }
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowAddEditLinkModal(true);
+                    }}
+                    className="group rounded-full bg-gray-100 p-1.5 transition-all duration-75 hover:scale-105 active:scale-95"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 text-gray-700" />
+                  </button>
+                </Tooltip>
+              )}
               {tag?.color && (
                 <button
-                  onClick={() => setShowTagLinkModal(true)}
-                  className="hidden transition-all duration-75 hover:scale-105 active:scale-100 sm:block"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setQueryString({
+                      router,
+                      param: "tagId",
+                      value: tag.id,
+                    });
+                  }}
+                  className="transition-all duration-75 hover:scale-105 active:scale-100"
                 >
                   <TagBadge {...tag} withIcon />
                 </button>
               )}
             </div>
-            <h3 className="max-w-[200px] truncate text-sm font-medium text-gray-700 md:max-w-md xl:max-w-lg">
-              {url}
-            </h3>
+            <div className="flex max-w-fit items-center space-x-1">
+              <Tooltip
+                content={
+                  <div className="w-full p-4">
+                    <Avatar user={user} className="h-10 w-10" />
+                    <p className="mt-2 text-sm font-semibold text-gray-700">
+                      {user?.name || user?.email}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Created{" "}
+                      {new Date(createdAt).toLocaleDateString("en-us", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                }
+              >
+                {/* Without the wrapping div, the Tooltip won't be triggered for some reason */}
+                <div className="w-4">
+                  <Avatar user={user} className="h-4 w-4" />
+                </div>
+              </Tooltip>
+              <p>•</p>
+              <p className="whitespace-nowrap text-sm text-gray-500">
+                {timeAgo(createdAt)}
+              </p>
+              <p className="hidden xs:block">•</p>
+              {rewrite && (
+                <Tooltip
+                  content={
+                    <SimpleTooltipContent
+                      title="This link is cloaked. Your users will only see the short link in the browser address bar."
+                      cta="Learn more."
+                      href={`${HOME_DOMAIN}/help/article/how-to-create-link#link-cloaking`}
+                    />
+                  }
+                >
+                  <EyeOff className="hidden h-4 w-4 text-gray-500 xs:block" />
+                </Tooltip>
+              )}
+              <a
+                onClick={(e) => {
+                  e.stopPropagation(); // to avoid selecting the link card
+                }}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden max-w-[140px] truncate text-sm font-medium text-gray-700 underline-offset-2 hover:underline xs:block sm:max-w-[300px] md:max-w-[360px] xl:max-w-[440px]"
+              >
+                {url}
+              </a>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center">
-          <p className="mr-3 hidden whitespace-nowrap text-sm text-gray-500 sm:block">
-            Added {timeAgo(createdAt)}
-          </p>
-          <p className="mr-1 whitespace-nowrap text-sm text-gray-500 sm:hidden">
-            {timeAgo(createdAt, true)}
-          </p>
+        <div className="flex items-center space-x-2">
+          <Number value={clicks} lastClicked={lastClicked}>
+            <Link
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              href={`/${
+                slug ? `${slug}/${domain}` : "links"
+              }/${encodeURIComponent(key)}`}
+              className="flex items-center space-x-1 rounded-md bg-gray-100 px-2 py-0.5 transition-all duration-75 hover:scale-105 active:scale-100"
+            >
+              <Chart className="h-4 w-4" />
+              <p className="whitespace-nowrap text-sm text-gray-500">
+                {nFormatter(clicks)}
+                <span className="ml-1 hidden sm:inline-block">clicks</span>
+              </p>
+            </Link>
+          </Number>
           <Popover
             content={
-              <div className="grid w-full gap-1 p-2 sm:w-48">
+              <div className="grid w-full gap-px p-2 sm:w-48">
                 {slug && exceededUsage ? (
                   <Tooltip
                     content={
                       <TooltipContent
                         title="Your project has exceeded its usage limit. We're still collecting data on your existing links, but you need to upgrade to edit them."
                         cta="Upgrade to Pro"
-                        href={`/${slug}/settings/billing`}
+                        onClick={() => {
+                          setOpenPopover(false);
+                          setShowUpgradePlanModal(true);
+                        }}
                       />
                     }
                   >
@@ -331,7 +431,10 @@ export default function LinkCard({ props }: { props: LinkProps }) {
                       <TooltipContent
                         title="Your project has exceeded its usage limit. We're still collecting data on your existing links, but you need to upgrade to create a new link."
                         cta="Upgrade to Pro"
-                        href={`/${slug}/settings/billing`}
+                        onClick={() => {
+                          setOpenPopover(false);
+                          setShowUpgradePlanModal(true);
+                        }}
                       />
                     }
                   >
@@ -362,20 +465,21 @@ export default function LinkCard({ props }: { props: LinkProps }) {
                     </kbd>
                   </button>
                 )}
-                {slug && (
-                  <button
-                    onClick={() => {
-                      setOpenPopover(false);
-                      setShowTagLinkModal(true);
-                    }}
-                    className="group flex w-full items-center justify-between rounded-md p-2 text-left text-sm font-medium text-gray-500 transition-all duration-75 hover:bg-gray-100"
-                  >
-                    <IconMenu text="Tag" icon={<Tag className="h-4 w-4" />} />
-                    <kbd className="hidden rounded bg-gray-100 px-2 py-0.5 text-xs font-light text-gray-500 transition-all duration-75 group-hover:bg-gray-200 sm:inline-block">
-                      T
-                    </kbd>
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    setOpenPopover(false);
+                    setShowLinkQRModal(true);
+                  }}
+                  className="group flex w-full items-center justify-between rounded-md p-2 text-left text-sm font-medium text-gray-500 transition-all duration-75 hover:bg-gray-100"
+                >
+                  <IconMenu
+                    text="QR Code"
+                    icon={<QrCode className="h-4 w-4" />}
+                  />
+                  <kbd className="hidden rounded bg-gray-100 px-2 py-0.5 text-xs font-light text-gray-500 transition-all duration-75 group-hover:bg-gray-200 sm:inline-block">
+                    Q
+                  </kbd>
+                </button>
                 <button
                   onClick={() => {
                     setOpenPopover(false);
@@ -384,7 +488,7 @@ export default function LinkCard({ props }: { props: LinkProps }) {
                   className="group flex w-full items-center justify-between rounded-md p-2 text-left text-sm font-medium text-gray-500 transition-all duration-75 hover:bg-gray-100"
                 >
                   <IconMenu
-                    text="Archive"
+                    text={archived ? "Unarchive" : "Archive"}
                     icon={<Archive className="h-4 w-4" />}
                   />
                   <kbd className="hidden rounded bg-gray-100 px-2 py-0.5 text-xs font-light text-gray-500 transition-all duration-75 group-hover:bg-gray-200 sm:inline-block">

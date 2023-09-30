@@ -1,8 +1,10 @@
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
-import { LinkProps } from "#/lib/types";
+import { type Link as LinkProps } from "@prisma/client";
 import { getDateTimeLocal } from "#/lib/utils";
 import Switch from "#/ui/switch";
 import { motion } from "framer-motion";
+import { FADE_IN_ANIMATION_SETTINGS, HOME_DOMAIN } from "#/lib/constants";
+import { InfoTooltip, SimpleTooltipContent } from "#/ui/tooltip";
 
 export default function ExpirationSection({
   props,
@@ -29,13 +31,24 @@ export default function ExpirationSection({
   }, [enabled]);
 
   return (
-    <div className="border-b border-gray-200 pb-5">
+    <div className="relative border-b border-gray-200 pb-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-gray-900">Expiration Date</h2>
+        <div className="flex items-center justify-between space-x-2">
+          <h2 className="text-sm font-medium text-gray-900">Expiration Date</h2>
+          <InfoTooltip
+            content={
+              <SimpleTooltipContent
+                title="Set an expiration date for your links – after which it won't be accessible."
+                cta="Learn more."
+                href={`${HOME_DOMAIN}/help/article/how-to-create-link#expiration-date`}
+              />
+            }
+          />
+        </div>
         <Switch fn={() => setEnabled(!enabled)} checked={enabled} />
       </div>
       {enabled && (
-        <motion.div className="mt-3">
+        <motion.div className="mt-3" {...FADE_IN_ANIMATION_SETTINGS}>
           <input
             type="datetime-local"
             id="expiresAt"
@@ -46,7 +59,7 @@ export default function ExpirationSection({
             onChange={(e) => {
               setData({ ...data, expiresAt: new Date(e.target.value) });
             }}
-            className="flex w-full items-center justify-center space-x-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-500 shadow-sm transition-all hover:border-gray-800 focus:border-gray-800 focus:outline-none focus:ring-gray-500"
+            className="flex w-full items-center justify-center space-x-2 rounded-md border border-gray-300 px-3 py-2 text-gray-500 shadow-sm transition-all hover:border-gray-800 focus:border-gray-800 focus:outline-none focus:ring-gray-500 sm:text-sm"
           />
         </motion.div>
       )}

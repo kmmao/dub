@@ -1,9 +1,10 @@
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
-import { LinkProps } from "#/lib/types";
+import { type Link as LinkProps } from "@prisma/client";
 import Switch from "#/ui/switch";
 import { motion } from "framer-motion";
-import { FADE_IN_ANIMATION_SETTINGS } from "#/lib/constants";
+import { FADE_IN_ANIMATION_SETTINGS, HOME_DOMAIN } from "#/lib/constants";
 import { Eye, EyeOff } from "@/components/shared/icons";
+import { InfoTooltip, SimpleTooltipContent } from "#/ui/tooltip";
 
 export default function PasswordSection({
   props,
@@ -32,11 +33,22 @@ export default function PasswordSection({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="border-b border-gray-200 pb-5">
+    <div className="relative border-b border-gray-200 pb-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-gray-900">
-          Password Protection
-        </h2>
+        <div className="flex items-center justify-between space-x-2">
+          <h2 className="text-sm font-medium text-gray-900">
+            Password Protection
+          </h2>
+          <InfoTooltip
+            content={
+              <SimpleTooltipContent
+                title="Restrict access to your short links by encrypting it with a password."
+                cta="Learn more."
+                href={`${HOME_DOMAIN}/help/article/how-to-create-link#password-protection`}
+              />
+            }
+          />
+        </div>
         <Switch fn={() => setEnabled(!enabled)} checked={enabled} />
       </div>
       {enabled && (
@@ -48,7 +60,7 @@ export default function PasswordSection({
             name="password"
             id="password"
             type={showPassword ? "text" : "password"}
-            className="block w-full rounded-md border-gray-300 text-sm text-gray-900 placeholder-gray-300 focus:border-gray-500 focus:outline-none focus:ring-gray-500"
+            className="block w-full rounded-md border-gray-300 text-gray-900 placeholder-gray-300 focus:border-gray-500 focus:outline-none focus:ring-gray-500 sm:text-sm"
             value={password || ""}
             placeholder="Enter password"
             onChange={(e) => {

@@ -7,14 +7,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { nFormatter, setQueryString } from "#/lib/utils";
-import { ChevronRight, XCircle, Search } from "lucide-react";
+import { nFormatter, setQueryString, truncate } from "#/lib/utils";
+import { ChevronRight, XCircle, Search, Check, Trash } from "lucide-react";
 import useDomains from "#/lib/swr/use-domains";
 import { AnimatePresence, motion } from "framer-motion";
 import { SWIPE_REVEAL_ANIMATION_SETTINGS } from "#/lib/constants";
 import { useDebouncedCallback } from "use-debounce";
 import useLinks from "#/lib/swr/use-links";
-import { LoadingSpinner } from "#/ui/icons";
+import { LoadingCircle, LoadingSpinner } from "#/ui/icons";
 import useLinksCount from "#/lib/swr/use-links-count";
 import punycode from "punycode/";
 import Switch from "#/ui/switch";
@@ -22,9 +22,13 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { ModalContext } from "#/ui/modal-provider";
 import useTags from "#/lib/swr/use-tags";
-import TagBadge from "@/components/app/links/tag-badge";
+import TagBadge, { COLORS_LIST } from "@/components/app/links/tag-badge";
 import { TagProps } from "#/lib/types";
-import Badge from "#/ui/badge";
+import { ThreeDots } from "@/components/shared/icons";
+import Popover from "#/ui/popover";
+import IconMenu from "@/components/shared/icon-menu";
+import { mutate } from "swr";
+import Number from "#/ui/number";
 
 export default function LinkFilters() {
   const { primaryDomain } = useDomains();
@@ -34,30 +38,51 @@ export default function LinkFilters() {
   const { data: tagsCount } = useLinksCount({ groupBy: "tagId" });
 
   const router = useRouter();
-  const { slug, sort, search, domain, userId, tagId } = router.query as {
-    slug: string;
-    sort?: string;
-    search?: string;
-    domain?: string;
-    userId?: string;
-    tagId?: string;
-  };
+  const { slug, sort, search, domain, userId, tagId, showArchived, page } =
+    router.query as {
+      slug: string;
+      sort?: string;
+      search?: string;
+      domain?: string;
+      userId?: string;
+      tagId?: string;
+      showArchived?: string;
+      page?: string;
+    };
   const searchInputRef = useRef(); // this is a hack to clear the search input when the clear button is clicked
+
+  useEffect(() => {
+    if (search) {
+      setQueryString({
+        router,
+        param: "showArchived",
+        value: "true",
+      });
+    }
+  }, [search]);
 
   return domains && tags && tagsCount ? (
     <div className="grid w-full rounded-md bg-white px-5 lg:divide-y lg:divide-gray-300">
       <div className="grid gap-3 py-6">
         <div className="flex items-center justify-between">
           <h3 className="ml-1 mt-2 font-semibold">Filter Links</h3>
-          {(sort || search || domain || userId || tagId) && (
-            <ClearButton searchInputRef={searchInputRef} />
-          )}
+          {(sort ||
+            search ||
+            domain ||
+            userId ||
+            tagId ||
+            showArchived ||
+            page) && <ClearButton searchInputRef={searchInputRef} />}
         </div>
         <SearchBox searchInputRef={searchInputRef} />
       </div>
       <DomainsFilter domains={domains} primaryDomain={primaryDomain} />
-      <TagsFilter tags={tags} tagsCount={tagsCount} />
-      {slug && <MyLinksFilter />}
+      {slug && (
+        <>
+          <TagsFilter tags={tags} tagsCount={tagsCount} />
+          <MyLinksFilter />
+        </>
+      )}
       <ArchiveFilter />
     </div>
   ) : (
@@ -90,7 +115,11 @@ const ClearButton = ({ searchInputRef }) => {
 const SearchBox = ({ searchInputRef }) => {
   const router = useRouter();
   const debounced = useDebouncedCallback((value) => {
-    setQueryString(router, "search", value);
+    setQueryString({
+      router,
+      param: "search",
+      value,
+    });
   }, 500);
   const { isValidating } = useLinks();
 
@@ -118,7 +147,7 @@ const SearchBox = ({ searchInputRef }) => {
     <div className="relative">
       <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
         {isValidating && searchInputRef.current?.value.length > 0 ? (
-          <LoadingSpinner />
+          <LoadingSpinner className="h-4 w-4" />
         ) : (
           <Search className="h-4 w-4 text-gray-400" />
         )}
@@ -126,7 +155,7 @@ const SearchBox = ({ searchInputRef }) => {
       <input
         ref={searchInputRef}
         type="text"
-        className="peer w-full rounded-md border border-gray-300 pl-10 text-sm text-black placeholder:text-gray-400 focus:border-black focus:ring-0"
+        className="peer w-full rounded-md border border-gray-300 pl-10 text-black placeholder:text-gray-400 focus:border-black focus:ring-0 sm:text-sm"
         placeholder="Search..."
         defaultValue={router.query.search}
         onChange={(e) => {
@@ -143,20 +172,19 @@ const DomainsFilter = ({ domains, primaryDomain }) => {
 
   const [collapsed, setCollapsed] = useState(false);
 
-  const options =
-    domains.length === 0
+  const options = useMemo(() => {
+    return domains.length === 0
       ? [
           {
-            name: primaryDomain || "",
             value: primaryDomain || "",
             count: 0,
           },
         ]
       : domains.map(({ domain, _count }) => ({
-          name: domain,
           value: domain,
           count: _count,
         }));
+  }, [domains, primaryDomain]);
 
   const { setShowAddEditDomainModal, setShowAddProjectModal } =
     useContext(ModalContext);
@@ -186,7 +214,7 @@ const DomainsFilter = ({ domains, primaryDomain }) => {
               );
             }
           }}
-          className="mr-2 rounded-md border border-gray-200 px-3 py-1 transition-all hover:border-gray-600 active:bg-gray-100"
+          className="rounded-md border border-gray-200 px-3 py-1 transition-all hover:border-gray-600 active:bg-gray-100"
         >
           <p className="text-sm text-gray-500">Add</p>
         </button>
@@ -197,7 +225,7 @@ const DomainsFilter = ({ domains, primaryDomain }) => {
             className="mt-4 grid gap-2"
             {...SWIPE_REVEAL_ANIMATION_SETTINGS}
           >
-            {options?.map(({ name, value, count }) => (
+            {options?.map(({ value, count }) => (
               <div
                 key={value}
                 className="relative flex cursor-pointer items-center space-x-3 rounded-md bg-gray-50 transition-all hover:bg-gray-100"
@@ -207,7 +235,11 @@ const DomainsFilter = ({ domains, primaryDomain }) => {
                   name={value}
                   checked={router.query.domain === value || domains.length <= 1}
                   onChange={() => {
-                    setQueryString(router, "domain", value);
+                    setQueryString({
+                      router,
+                      param: "domain",
+                      value,
+                    });
                   }}
                   type="radio"
                   className="ml-3 h-4 w-4 cursor-pointer rounded-full border-gray-300 text-black focus:outline-none focus:ring-0"
@@ -216,8 +248,10 @@ const DomainsFilter = ({ domains, primaryDomain }) => {
                   htmlFor={value}
                   className="flex w-full cursor-pointer justify-between px-3 py-2 pl-0 text-sm font-medium text-gray-700"
                 >
-                  <p>{punycode.toUnicode(name || "")}</p>
-                  <p className="text-gray-500">{nFormatter(count)}</p>
+                  <p>{truncate(punycode.toUnicode(value || ""), 24)}</p>
+                  <Number value={count} unit="links">
+                    <p className="text-gray-500">{nFormatter(count)}</p>
+                  </Number>
                 </label>
               </div>
             ))}
@@ -236,7 +270,6 @@ const TagsFilter = ({
   tagsCount: { tagId: string; _count: number }[];
 }) => {
   const router = useRouter();
-  const { slug } = router.query as { slug?: string };
   const [collapsed, setCollapsed] = useState(tags.length === 0 ? true : false);
   const [search, setSearch] = useState("");
   const [showMore, setShowMore] = useState(false);
@@ -256,20 +289,6 @@ const TagsFilter = ({
       : initialOptions;
   }, [tagsCount, tags, search]);
 
-  const { setShowTagLinkModal, setShowAddProjectModal } =
-    useContext(ModalContext);
-
-  const addTag = useCallback(() => {
-    if (slug) {
-      setShowTagLinkModal(true);
-    } else {
-      setShowAddProjectModal(true);
-      toast.error(
-        "You can only add a tag to a custom project. Please create a new project or navigate to an existing one.",
-      );
-    }
-  }, [setShowTagLinkModal, setShowAddProjectModal, slug]);
-
   return (
     <fieldset className="overflow-hidden py-6">
       <div className="flex h-8 items-center justify-between">
@@ -283,13 +302,6 @@ const TagsFilter = ({
             className={`${collapsed ? "" : "rotate-90"} h-5 w-5 transition-all`}
           />
           <h4 className="font-medium text-gray-900">Tags</h4>
-          <Badge text="New" variant="blue" className="-mt-3" />
-        </button>
-        <button
-          onClick={addTag}
-          className="mr-2 rounded-md border border-gray-200 px-3 py-1 transition-all hover:border-gray-600 active:bg-gray-100"
-        >
-          <p className="text-sm text-gray-500">Add</p>
         </button>
       </div>
       <AnimatePresence initial={false}>
@@ -299,15 +311,7 @@ const TagsFilter = ({
             {...SWIPE_REVEAL_ANIMATION_SETTINGS}
           >
             {tags?.length === 0 ? ( // if the project has no tags
-              <p className="text-center text-sm text-gray-500">
-                No tags yet.{" "}
-                <button
-                  className="font-medium underline underline-offset-4 transition-colors hover:text-black"
-                  onClick={addTag}
-                >
-                  Add one.
-                </button>
-              </p>
+              <p className="text-center text-sm text-gray-500">No tags yet.</p>
             ) : (
               <>
                 <div className="relative mb-1">
@@ -334,14 +338,18 @@ const TagsFilter = ({
               .map(({ id, name, color, count }) => (
                 <div
                   key={id}
-                  className="relative flex cursor-pointer items-center space-x-3 rounded-md bg-gray-50 transition-all hover:bg-gray-100"
+                  className="group relative flex cursor-pointer items-center space-x-3 rounded-md bg-gray-50 transition-all hover:bg-gray-100"
                 >
                   <input
                     id={id}
                     name={id}
                     checked={router.query.tagId === id}
                     onChange={() => {
-                      setQueryString(router, "tagId", id);
+                      setQueryString({
+                        router,
+                        param: "tagId",
+                        value: id,
+                      });
                     }}
                     type="radio"
                     className="ml-3 h-4 w-4 cursor-pointer rounded-full border-gray-300 text-black focus:outline-none focus:ring-0"
@@ -351,7 +359,7 @@ const TagsFilter = ({
                     className="flex w-full cursor-pointer justify-between px-3 py-1.5 pl-0 text-sm font-medium text-gray-700"
                   >
                     <TagBadge name={name} color={color} />
-                    <p className="text-gray-500">{nFormatter(count)}</p>
+                    <TagPopover tag={{ id, name, color }} count={count} />
                   </label>
                 </div>
               ))}
@@ -370,6 +378,146 @@ const TagsFilter = ({
   );
 };
 
+const TagPopover = ({ tag, count }: { tag: TagProps; count: number }) => {
+  const router = useRouter();
+  const { slug } = router.query as { slug: string };
+  const [data, setData] = useState(tag);
+  const [openPopover, setOpenPopover] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  const handleEdit = async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setProcessing(true);
+    fetch(`/api/projects/${slug}/tags/${tag.id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    }).then(async (res) => {
+      setProcessing(false);
+      if (res.ok) {
+        await mutate(`/api/projects/${slug}/tags`);
+        toast.success("Tag updated");
+      } else {
+        toast.error("Something went wrong");
+      }
+    });
+  };
+
+  const handleDelete = async () => {
+    setProcessing(true);
+    fetch(`/api/projects/${slug}/tags/${tag.id}`, {
+      method: "DELETE",
+    }).then(async (res) => {
+      if (res.ok) {
+        await mutate(`/api/projects/${slug}/tags`);
+        toast.success("Tag deleted");
+      } else {
+        toast.error("Something went wrong");
+      }
+      setProcessing(false);
+    });
+  };
+
+  return processing ? (
+    <LoadingCircle />
+  ) : (
+    <Popover
+      content={
+        <div className="flex w-48 flex-col divide-y divide-gray-200">
+          <div className="p-2">
+            <form
+              onClick={(e) => e.stopPropagation()} // prevent triggering <Command.Item> onClick
+              onKeyDown={(e) => e.stopPropagation()} // prevent triggering <Command.Item> onKeyDown
+              onSubmit={handleEdit}
+              className="relative py-1"
+            >
+              <div className="my-2 flex items-center justify-between px-3">
+                <p className="text-xs text-gray-500">Edit Tag</p>
+                {data !== tag && (
+                  <button className="text-xs text-gray-500">Save</button>
+                )}
+              </div>
+              <input
+                type="text"
+                autoFocus
+                required
+                onKeyDown={(e) => {
+                  // if ESC key pressed, close popover
+                  if (e.key === "Escape") {
+                    setOpenPopover(false);
+                  }
+                }}
+                value={data.name}
+                onChange={(e) => setData({ ...data, name: e.target.value })}
+                className="block w-full rounded-md border-gray-300 py-1 pr-7 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-gray-500"
+              />
+              <div className="grid grid-cols-3 gap-3 p-3 pb-0">
+                {COLORS_LIST.map(({ color, css }) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full transition-all duration-75 hover:scale-110 active:scale-90 ${css}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setData({ ...data, color });
+                    }}
+                  >
+                    {data.color === color && <Check className="h-4 w-4" />}
+                  </button>
+                ))}
+              </div>
+            </form>
+          </div>
+          <div className="p-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                confirm(
+                  "Are you sure you want to delete this tag? All tagged links will be untagged, but they won't be deleted.",
+                ) && handleDelete();
+              }}
+              className="flex w-full items-center space-x-2 rounded-md p-2 text-red-600 transition-colors hover:bg-red-100 active:bg-red-200"
+            >
+              <IconMenu
+                text="Delete Tag"
+                icon={<Trash className="h-4 w-4 text-red-600" />}
+              />
+            </button>
+          </div>
+        </div>
+      }
+      align="end"
+      openPopover={openPopover}
+      setOpenPopover={setOpenPopover}
+    >
+      <button
+        type="button"
+        onClick={() => setOpenPopover(!openPopover)}
+        className={`${
+          openPopover ? "bg-gray-200" : "hover:bg-gray-200"
+        } -mr-1 flex h-6 w-5 items-center justify-center rounded-md transition-colors`}
+      >
+        <ThreeDots
+          className={`h-4 w-4 text-gray-500 ${
+            openPopover ? "" : "hidden group-hover:block"
+          }`}
+        />
+        <p
+          className={`text-gray-500 ${
+            openPopover ? "hidden" : "group-hover:hidden"
+          }`}
+        >
+          {nFormatter(count)}
+        </p>
+      </button>
+    </Popover>
+  );
+};
+
 const MyLinksFilter = () => {
   const router = useRouter();
   const { userId } = router.query as { userId?: string };
@@ -382,8 +530,12 @@ const MyLinksFilter = () => {
       </label>
       <Switch
         fn={() =>
-          // @ts-ignore
-          setQueryString(router, "userId", userId ? "" : session?.user.id)
+          setQueryString({
+            router,
+            param: "userId",
+            // @ts-ignore
+            value: userId ? "" : session?.user?.id,
+          })
         }
         checked={userId ? true : false}
       />
@@ -402,8 +554,11 @@ const ArchiveFilter = () => {
       </label>
       <Switch
         fn={() =>
-          // @ts-ignore
-          setQueryString(router, "showArchived", showArchived ? "" : "true")
+          setQueryString({
+            router,
+            param: "showArchived",
+            value: showArchived ? "" : "true",
+          })
         }
         checked={showArchived ? true : false}
       />

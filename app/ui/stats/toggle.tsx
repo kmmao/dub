@@ -1,14 +1,9 @@
 import { useContext, useMemo, useState } from "react";
-import {
-  Calendar,
-  ChevronDown,
-  Copy,
-  Share,
-  Tick,
-} from "@/components/shared/icons";
+import { Copy, Tick } from "@/components/shared/icons";
+import { Calendar, ChevronDown, Share2, Lock } from "lucide-react";
 import { ExpandingArrow } from "#/ui/icons";
 import { INTERVALS } from "#/lib/stats";
-import { linkConstructor } from "#/lib/utils";
+import { cn, linkConstructor } from "#/lib/utils";
 import IconMenu from "@/components/shared/icon-menu";
 import Popover from "#/ui/popover";
 import useSWR, { mutate } from "swr";
@@ -19,9 +14,10 @@ import Link from "next/link";
 import { StatsContext } from ".";
 import useScroll from "#/lib/hooks/use-scroll";
 import Tooltip, { TooltipContent } from "../tooltip";
-import useProject from "#/lib/hooks/use-project";
+import useProject from "#/lib/swr-app/use-project";
 import { useParams } from "next/navigation";
-import { Lock } from "lucide-react";
+import { APP_DOMAIN } from "#/lib/constants";
+import punycode from "punycode/";
 
 export default function Toggle() {
   const { slug: projectSlug } = useParams() as { slug?: string };
@@ -38,22 +34,24 @@ export default function Toggle() {
 
   return (
     <div
-      className={`z-10 mb-5 ${
-        basePath.startsWith("/stats")
-          ? `top-0 ${!modal ? "md:top-14" : ""}`
-          : "top-[6.95rem]"
-      } sticky bg-gray-50 py-3 md:py-5 ${
-        scrolled && !modal ? "shadow-md" : ""
-      }`}
+      className={cn("sticky top-[6.95rem] z-10 mb-5 bg-gray-50 py-3 md:py-5", {
+        "top-14": basePath.startsWith("/stats"),
+        "top-6 md:top-0": modal,
+        "shadow-md": scrolled && !modal,
+      })}
     >
-      <div className="mx-auto flex max-w-4xl flex-col items-center justify-between space-y-3 px-2.5 md:flex-row md:space-y-0 lg:px-0">
+      <div className="mx-auto flex h-20 max-w-4xl flex-col items-center justify-between space-y-3 px-2.5 md:h-10 md:flex-row md:space-y-0 lg:px-0">
         <a
           className="group flex text-lg font-semibold text-gray-800 md:text-xl"
           href={linkConstructor({ key, domain })}
           target="_blank"
           rel="noreferrer"
         >
-          {linkConstructor({ key, domain, pretty: true })}
+          {linkConstructor({
+            key,
+            domain: punycode.toUnicode(domain),
+            pretty: true,
+          })}
           <ExpandingArrow className="h-5 w-5" />
         </a>
         <div className="flex items-center">
@@ -62,9 +60,8 @@ export default function Toggle() {
           )}
           <Popover
             content={
-              <div className="w-full p-2 md:w-48">
+              <div className="grid w-full p-2 md:w-48">
                 {INTERVALS.map(({ display, slug }) =>
-                  !(domain === "dub.sh" && key === "github") &&
                   (slug === "all" || slug === "90d") &&
                   (!plan || plan === "free") ? (
                     <Tooltip
@@ -79,7 +76,7 @@ export default function Toggle() {
                           cta={
                             projectSlug ? "Upgrade to Pro" : "Create Project"
                           }
-                          href="https://app.dub.sh"
+                          href={APP_DOMAIN}
                         />
                       }
                     >
@@ -154,11 +151,11 @@ const SharePopover = () => {
           }),
         });
         if (res.status === 200) {
-          mutate(`${endpoint}${queryString}`);
+          await mutate(`${endpoint}${queryString}`);
           !publicStats &&
-            navigator.clipboard.writeText(`https://${domain}/stats/${key}`);
-          // artificial delay to sync toast with the switch change
-          await new Promise((r) => setTimeout(r, 200));
+            navigator.clipboard.writeText(
+              `https://${domain}/stats/${encodeURIComponent(key)}`,
+            );
         }
         setUpdating(false);
         resolve();
@@ -203,14 +200,14 @@ const SharePopover = () => {
             <div className="divide-x-200 mt-2 flex items-center justify-between divide-x overflow-hidden rounded-md border border-gray-200 bg-gray-100">
               <div className="overflow-scroll pl-2 scrollbar-hide">
                 <p className="whitespace-nowrap text-gray-600">
-                  https://{domain}/stats/{key}
+                  https://{domain}/stats/{encodeURIComponent(key)}
                 </p>
               </div>
               <button
                 className="h-8 flex-none border-l bg-white px-2 hover:bg-gray-50 active:bg-gray-100"
                 onClick={() => {
                   navigator.clipboard.writeText(
-                    `https://${domain}/stats/${key}`,
+                    `https://${domain}/stats/${encodeURIComponent(key)}`,
                   );
                   setCopied(true);
                   toast.success("Copied to clipboard");
@@ -235,7 +232,7 @@ const SharePopover = () => {
         onClick={() => setopenSharePopoverPopover(!openSharePopover)}
         className="mr-2 flex w-24 items-center justify-center space-x-2 rounded-md bg-white px-3 py-2.5 shadow transition-all duration-75 hover:shadow-md active:scale-95"
       >
-        <IconMenu text="Share" icon={<Share className="h-4 w-4" />} />
+        <IconMenu text="Share" icon={<Share2 className="h-4 w-4" />} />
       </button>
     </Popover>
   );
