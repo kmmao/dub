@@ -45,9 +45,9 @@ To develop Dub locally, you will need to clone this repository and set up all th
 Once that's done, you can use the following commands to run the app locally:
 
 ```
-yarn
-yarn build
-yarn dev
+pnpm i
+pnpm build
+pnpm dev
 ```
 
 We're planning to add a proper, well-documented self-hosting guide for Dub soon – stay tuned!
@@ -62,8 +62,9 @@ We're planning to add a proper, well-documented self-hosting guide for Dub soon 
 - [PlanetScale](https://planetscale.com/) – database
 - [NextAuth.js](https://next-auth.js.org/) – auth
 - [BoxyHQ](https://boxyhq.com/enterprise-sso) – SSO/SAML
-- [Vercel](https://vercel.com/) – hosting
+- [Turborepo](https://turbo.build/repo) – monorepo
 - [Stripe](https://stripe.com/) – payments
+- [Vercel](https://vercel.com/) – deployments
 
 ## Contributing
 
@@ -83,5 +84,3 @@ We love our contributors! Here's how you can contribute:
 ## License
 
 Inspired by [Plausible](https://plausible.io/), Dub is open-source under the GNU Affero General Public License Version 3 (AGPLv3) or any later version. You can [find it here](https://github.com/steven-tey/dub/blob/main/LICENSE.md).
-
-It is also worth noting that the AGPLv3 license applies only to the Dub app only (everything under `app.dub.co`) – everything else (e.g. `dub.co` marketing pages) are available as a reference only. Simply copying and redistributing the designs for commercial use (without significant changes) is considered a violation of our license.
